@@ -5,7 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
+import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import BudgetView from "@/pages/BudgetView";
 import AccountsView from "@/pages/AccountsView";
@@ -14,7 +16,7 @@ import ReportsView from "@/pages/ReportsView";
 import AdminDashboard from "@/pages/AdminDashboard";
 import SettingsView from "@/pages/SettingsView";
 
-function Router() {
+function AuthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -29,15 +31,37 @@ function Router() {
   );
 }
 
-export default function App() {
+function UnauthenticatedRouter() {
+  return (
+    <Switch>
+      <Route path="/" component={Landing} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function AppContent() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+    <TooltipProvider>
+      {isAuthenticated ? (
         <SidebarProvider style={style as React.CSSProperties}>
           <div className="flex h-screen w-full">
             <AppSidebar />
@@ -46,13 +70,23 @@ export default function App() {
                 <SidebarTrigger data-testid="button-sidebar-toggle" />
               </header>
               <main className="flex-1 overflow-auto">
-                <Router />
+                <AuthenticatedRouter />
               </main>
             </div>
           </div>
         </SidebarProvider>
-        <Toaster />
-      </TooltipProvider>
+      ) : (
+        <UnauthenticatedRouter />
+      )}
+      <Toaster />
+    </TooltipProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
     </QueryClientProvider>
   );
 }

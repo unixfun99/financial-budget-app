@@ -4,6 +4,8 @@ import {
   categories,
   transactions,
   budgetShares,
+  simplefinConnections,
+  importLogs,
   type User,
   type UpsertUser,
   type Account,
@@ -14,6 +16,10 @@ import {
   type InsertTransaction,
   type BudgetShare,
   type InsertBudgetShare,
+  type SimplefinConnection,
+  type InsertSimplefinConnection,
+  type ImportLog,
+  type InsertImportLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, or } from "drizzle-orm";
@@ -53,6 +59,17 @@ export interface IStorage {
   // Financial planner operations
   getFinancialPlanners(): Promise<User[]>;
   updateUserRole(userId: string, isFinancialPlanner: boolean): Promise<User | undefined>;
+  
+  // SimpleFIN operations
+  getSimplefinConnections(userId: string): Promise<SimplefinConnection[]>;
+  getSimplefinConnection(id: string, userId: string): Promise<SimplefinConnection | undefined>;
+  createSimplefinConnection(connection: InsertSimplefinConnection): Promise<SimplefinConnection>;
+  updateSimplefinConnection(id: string, userId: string, updates: Partial<InsertSimplefinConnection>): Promise<SimplefinConnection | undefined>;
+  deleteSimplefinConnection(id: string, userId: string): Promise<boolean>;
+  
+  // Import log operations
+  createImportLog(log: InsertImportLog): Promise<ImportLog>;
+  getImportLogs(userId: string): Promise<ImportLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -265,6 +282,68 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updated;
+  }
+
+  // SimpleFIN operations
+  async getSimplefinConnections(userId: string): Promise<SimplefinConnection[]> {
+    return await db
+      .select()
+      .from(simplefinConnections)
+      .where(eq(simplefinConnections.userId, userId));
+  }
+
+  async getSimplefinConnection(id: string, userId: string): Promise<SimplefinConnection | undefined> {
+    const [connection] = await db
+      .select()
+      .from(simplefinConnections)
+      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)));
+    return connection;
+  }
+
+  async createSimplefinConnection(connection: InsertSimplefinConnection): Promise<SimplefinConnection> {
+    const [newConnection] = await db.insert(simplefinConnections).values(connection).returning();
+    return newConnection;
+  }
+
+  async updateSimplefinConnection(id: string, userId: string, updates: Partial<InsertSimplefinConnection>): Promise<SimplefinConnection | undefined> {
+    const existing = await db
+      .select()
+      .from(simplefinConnections)
+      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)))
+      .limit(1);
+    
+    if (!existing.length) {
+      return undefined;
+    }
+    
+    const [updated] = await db
+      .update(simplefinConnections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteSimplefinConnection(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(simplefinConnections)
+      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Import log operations
+  async createImportLog(log: InsertImportLog): Promise<ImportLog> {
+    const [newLog] = await db.insert(importLogs).values(log).returning();
+    return newLog;
+  }
+
+  async getImportLogs(userId: string): Promise<ImportLog[]> {
+    return await db
+      .select()
+      .from(importLogs)
+      .where(eq(importLogs.userId, userId))
+      .orderBy(desc(importLogs.createdAt));
   }
 }
 

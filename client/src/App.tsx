@@ -25,7 +25,7 @@ function AuthenticatedRouter() {
       <Route path="/accounts" component={AccountsView} />
       <Route path="/transactions" component={TransactionsView} />
       <Route path="/reports" component={ReportsView} />
-      <Route path="/import" component={ImportSyncView} />
+      <Route path="/import-sync" component={ImportSyncView} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/settings" component={SettingsView} />
       <Route component={NotFound} />

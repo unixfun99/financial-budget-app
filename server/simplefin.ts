@@ -45,8 +45,28 @@ function validateSimplefinClaimUrl(url: string): void {
     throw new Error('Setup token must use HTTPS');
   }
   
-  if (!ALLOWED_SIMPLEFIN_HOSTS.includes(parsedUrl.hostname)) {
-    console.warn('[SimpleFIN] Rejected unauthorized host:', parsedUrl.hostname);
+  // Use exact host match to prevent subdomain bypass attacks (e.g., bridge.simplefin.org.evil.com)
+  const actualHost = parsedUrl.host; // includes port if present
+  const actualHostname = parsedUrl.hostname; // hostname without port
+  
+  // Check exact hostname match (not just substring)
+  if (!ALLOWED_SIMPLEFIN_HOSTS.includes(actualHostname)) {
+    console.warn('[SimpleFIN] Rejected unauthorized host:', actualHostname);
+    throw new Error('Setup token host not authorized');
+  }
+  
+  // Additional validation: ensure the host doesn't have any extra dots or subdomains beyond the allowed list
+  // This prevents tricks like "bridge.simplefin.org.evil.com"
+  const hostParts = actualHostname.split('.');
+  const isExactMatch = ALLOWED_SIMPLEFIN_HOSTS.some(allowedHost => {
+    const allowedParts = allowedHost.split('.');
+    // Must have same number of parts and match exactly
+    return hostParts.length === allowedParts.length && 
+           hostParts.every((part, index) => part === allowedParts[index]);
+  });
+  
+  if (!isExactMatch) {
+    console.warn('[SimpleFIN] Rejected host with extra subdomains or mismatched structure:', actualHostname);
     throw new Error('Setup token host not authorized');
   }
   

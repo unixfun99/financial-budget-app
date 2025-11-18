@@ -71,10 +71,15 @@ SimpleFIN provides secure bank account syncing for $1.50/month. The integration 
 
 ### Security Implementation
 - **Access URLs:** Encrypted using AES-256-GCM with `ENCRYPTION_KEY` environment variable
-- **Claim URL Validation:** Strict HTTPS-only validation on approved hosts:
-  - `bridge.simplefin.org`
-  - `beta-bridge.simplefin.org`
-- **SSRF Protection:** Prevents Server-Side Request Forgery attacks by validating claim URLs
+- **Claim URL Validation:** Multi-layer validation to prevent SSRF attacks:
+  - Protocol: Must be HTTPS only
+  - Host allowlist: Only `bridge.simplefin.org` and `beta-bridge.simplefin.org`
+  - Exact hostname matching: Validates hostname structure to prevent subdomain bypass (e.g., rejects `bridge.simplefin.org.evil.com`)
+  - Path validation: Must contain `/simplefin` in the path
+- **SSRF Protection:** Defense-in-depth approach prevents Server-Side Request Forgery attacks through:
+  - URL parsing validation
+  - Hostname part count verification (prevents extra subdomains)
+  - Exact string matching of allowed hosts
 
 ### Setup Process
 1. User visits https://bridge.simplefin.org

@@ -28,7 +28,7 @@ const mainMenuItems = [
   { title: "Accounts", url: "/accounts", icon: Wallet },
   { title: "Transactions", url: "/transactions", icon: ArrowLeftRight },
   { title: "Reports", url: "/reports", icon: TrendingUp },
-  { title: "Import & Sync", url: "/import", icon: Download },
+  { title: "Import & Sync", url: "/import-sync", icon: Download },
 ];
 
 const adminMenuItems = [

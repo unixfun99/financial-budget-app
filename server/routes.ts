@@ -648,6 +648,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import logs endpoint
+  app.get("/api/import/logs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const logs = await storage.getImportLogs(userId);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching import logs:", error);
+      res.status(500).json({ message: "Failed to fetch import logs" });
+    }
+  });
+
   // Actual Budget import route
   app.post("/api/import/actual-budget", isAuthenticated, async (req: any, res) => {
     try {

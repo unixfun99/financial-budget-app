@@ -16,7 +16,8 @@ import {
   FolderKanban, 
   TrendingUp,
   Settings,
-  Users
+  Users,
+  Download
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { ThemeToggle } from "./ThemeToggle";
@@ -27,6 +28,7 @@ const mainMenuItems = [
   { title: "Accounts", url: "/accounts", icon: Wallet },
   { title: "Transactions", url: "/transactions", icon: ArrowLeftRight },
   { title: "Reports", url: "/reports", icon: TrendingUp },
+  { title: "Import & Sync", url: "/import", icon: Download },
 ];
 
 const adminMenuItems = [

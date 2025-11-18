@@ -15,6 +15,7 @@ import TransactionsView from "@/pages/TransactionsView";
 import ReportsView from "@/pages/ReportsView";
 import AdminDashboard from "@/pages/AdminDashboard";
 import SettingsView from "@/pages/SettingsView";
+import ImportSyncView from "@/pages/ImportSyncView";
 
 function AuthenticatedRouter() {
   return (
@@ -24,6 +25,7 @@ function AuthenticatedRouter() {
       <Route path="/accounts" component={AccountsView} />
       <Route path="/transactions" component={TransactionsView} />
       <Route path="/reports" component={ReportsView} />
+      <Route path="/import" component={ImportSyncView} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/settings" component={SettingsView} />
       <Route component={NotFound} />

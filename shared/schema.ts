@@ -91,6 +91,40 @@ export const budgetShares = pgTable("budget_shares", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// SimpleFIN bank connections - stores encrypted access URLs for bank syncing
+export const simplefinConnections = pgTable("simplefin_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  accessUrl: text("access_url").notNull(), // Encrypted SimpleFIN access URL with embedded credentials
+  connectionName: varchar("connection_name", { length: 255 }), // User-friendly name
+  lastSync: timestamp("last_sync"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const importSourceEnum = pgEnum("import_source", [
+  "ynab_json",
+  "ynab_csv",
+  "actual_budget",
+  "simplefin",
+  "csv",
+]);
+
+// Import logs - tracks all imports from external sources
+export const importLogs = pgTable("import_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  source: importSourceEnum("source").notNull(),
+  fileName: varchar("file_name", { length: 255 }),
+  accountsImported: decimal("accounts_imported", { precision: 10, scale: 0 }).default("0").notNull(),
+  transactionsImported: decimal("transactions_imported", { precision: 10, scale: 0 }).default("0").notNull(),
+  categoriesImported: decimal("categories_imported", { precision: 10, scale: 0 }).default("0").notNull(),
+  status: varchar("status", { length: 50 }).default("success").notNull(), // success, partial, failed
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -98,6 +132,22 @@ export const usersRelations = relations(users, ({ many }) => ({
   transactions: many(transactions),
   sharedBudgets: many(budgetShares, { relationName: "sharedBudgets" }),
   budgetsSharedWithMe: many(budgetShares, { relationName: "budgetsSharedWithMe" }),
+  simplefinConnections: many(simplefinConnections),
+  importLogs: many(importLogs),
+}));
+
+export const simplefinConnectionsRelations = relations(simplefinConnections, ({ one }) => ({
+  user: one(users, {
+    fields: [simplefinConnections.userId],
+    references: [users.id],
+  }),
+}));
+
+export const importLogsRelations = relations(importLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [importLogs.userId],
+    references: [users.id],
+  }),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -160,6 +210,12 @@ export type Transaction = typeof transactions.$inferSelect;
 export type InsertBudgetShare = typeof budgetShares.$inferInsert;
 export type BudgetShare = typeof budgetShares.$inferSelect;
 
+export type InsertSimplefinConnection = typeof simplefinConnections.$inferInsert;
+export type SimplefinConnection = typeof simplefinConnections.$inferSelect;
+
+export type InsertImportLog = typeof importLogs.$inferInsert;
+export type ImportLog = typeof importLogs.$inferSelect;
+
 // Zod schemas for validation
 export const insertAccountSchema = createInsertSchema(accounts).omit({
   id: true,
@@ -203,4 +259,21 @@ export const insertBudgetShareSchema = createInsertSchema(budgetShares).omit({
   id: true,
   userId: true,
   createdAt: true,
+});
+
+export const insertSimplefinConnectionSchema = createInsertSchema(simplefinConnections).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertImportLogSchema = createInsertSchema(importLogs).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+}).extend({
+  accountsImported: z.coerce.number().transform(val => val.toString()),
+  transactionsImported: z.coerce.number().transform(val => val.toString()),
+  categoriesImported: z.coerce.number().transform(val => val.toString()),
 });

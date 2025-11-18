@@ -6,40 +6,46 @@ import { TransactionForm } from "@/components/TransactionForm";
 import { ImportCSV } from "@/components/ImportCSV";
 import { Plus, Upload, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { useState } from "react";
-
-//todo: remove mock functionality
-const mockAccounts = [
-  { name: "Checking", type: "Checking", balance: 5234.50, change: 123.45, changePercent: 2.4 },
-  { name: "Savings", type: "Savings", balance: 12890.00, change: -45.20, changePercent: -0.35 },
-  { name: "Credit Card", type: "Credit", balance: -890.25, change: -120.00, changePercent: 15.6 },
-];
-
-//todo: remove mock functionality
-const mockTransactions: Transaction[] = [
-  { id: "1", date: "2024-01-15", payee: "Whole Foods", category: "Groceries", account: "Checking", amount: -145.32 },
-  { id: "2", date: "2024-01-14", payee: "Monthly Salary", category: "Income", account: "Checking", amount: 4500.00 },
-  { id: "3", date: "2024-01-13", payee: "Electric Company", category: "Utilities", account: "Checking", amount: -89.50 },
-  { id: "4", date: "2024-01-12", payee: "Netflix", category: "Entertainment", account: "Credit Card", amount: -15.99 },
-  { id: "5", date: "2024-01-11", payee: "Gas Station", category: "Transportation", account: "Credit Card", amount: -45.00 },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Account, Transaction as DBTransaction } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showImportCSV, setShowImportCSV] = useState(false);
-  const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
+  const { toast } = useToast();
 
-  const handleAddTransaction = (transaction: any) => {
-    const newTransaction: Transaction = {
-      id: Date.now().toString(),
-      ...transaction,
-    };
-    setTransactions([newTransaction, ...transactions]);
-    console.log("Transaction added:", newTransaction);
-  };
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
+    queryKey: ['/api/accounts'],
+  });
+
+  const { data: transactions = [], isLoading: transactionsLoading } = useQuery<DBTransaction[]>({
+    queryKey: ['/api/transactions'],
+  });
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/transactions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      toast({
+        title: "Transaction deleted",
+        description: "The transaction has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleDeleteTransaction = (id: string) => {
-    setTransactions(transactions.filter(t => t.id !== id));
-    console.log("Transaction deleted:", id);
+    deleteTransactionMutation.mutate(id);
   };
 
   const handleEditTransaction = (transaction: Transaction) => {
@@ -50,9 +56,37 @@ export default function Dashboard() {
     console.log("Import CSV:", file.name);
   };
 
-  const totalBalance = mockAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalIncome = transactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = transactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  if (accountsLoading || transactionsLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance), 0);
+  const totalIncome = transactions.filter(t => parseFloat(t.amount) > 0).reduce((sum, t) => sum + parseFloat(t.amount), 0);
+  const totalExpenses = transactions.filter(t => parseFloat(t.amount) < 0).reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+
+  const displayTransactions: Transaction[] = transactions.slice(0, 5).map(t => ({
+    id: t.id,
+    date: new Date(t.date).toISOString().split('T')[0],
+    payee: t.payee,
+    category: t.categoryId || '',
+    account: t.accountId,
+    amount: parseFloat(t.amount),
+  }));
+
+  const displayAccounts = accounts.slice(0, 3).map(acc => ({
+    name: acc.name,
+    type: acc.type.charAt(0).toUpperCase() + acc.type.slice(1),
+    balance: parseFloat(acc.balance),
+    change: 0,
+    changePercent: 0,
+  }));
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
@@ -103,7 +137,7 @@ export default function Dashboard() {
             <div className="text-2xl font-mono font-semibold tracking-tight text-primary" data-testid="text-total-income">
               +${totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">January 2024</p>
+            <p className="text-xs text-muted-foreground mt-1">This month</p>
           </CardContent>
         </Card>
 
@@ -116,35 +150,56 @@ export default function Dashboard() {
             <div className="text-2xl font-mono font-semibold tracking-tight text-destructive" data-testid="text-total-expenses">
               -${totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">January 2024</p>
+            <p className="text-xs text-muted-foreground mt-1">This month</p>
           </CardContent>
         </Card>
       </div>
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Accounts</h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          {mockAccounts.map((account) => (
-            <AccountCard key={account.name} {...account} />
-          ))}
-        </div>
+        {accounts.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-muted-foreground mb-4">No accounts yet. Add your first account to get started!</p>
+            <Button data-testid="button-add-account">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Account
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            {displayAccounts.map((account) => (
+              <AccountCard key={account.name} {...account} />
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Recent Transactions</h2>
-        </div>
-        <TransactionsTable
-          transactions={transactions.slice(0, 10)}
-          onEdit={handleEditTransaction}
-          onDelete={handleDeleteTransaction}
-        />
+        <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
+        {transactions.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-muted-foreground mb-4">No transactions yet. Add your first transaction to start tracking!</p>
+            <Button onClick={() => setShowTransactionForm(true)} data-testid="button-add-first-transaction">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Transaction
+            </Button>
+          </Card>
+        ) : (
+          <TransactionsTable
+            transactions={displayTransactions}
+            onEdit={handleEditTransaction}
+            onDelete={handleDeleteTransaction}
+          />
+        )}
       </div>
 
       <TransactionForm
         open={showTransactionForm}
         onClose={() => setShowTransactionForm(false)}
-        onSave={handleAddTransaction}
+        onSave={(data) => {
+          console.log("Transaction saved:", data);
+          setShowTransactionForm(false);
+        }}
       />
 
       <ImportCSV

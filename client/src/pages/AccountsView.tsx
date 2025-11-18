@@ -2,35 +2,102 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AccountCard } from "@/components/AccountCard";
 import { TransactionsTable, type Transaction } from "@/components/TransactionsTable";
+import { AccountForm } from "@/components/AccountForm";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-
-//todo: remove mock functionality
-const mockAccounts = [
-  { name: "Checking Account", type: "Checking", balance: 5234.50, change: 123.45, changePercent: 2.4 },
-  { name: "Savings Account", type: "Savings", balance: 12890.00, change: -45.20, changePercent: -0.35 },
-  { name: "Emergency Fund", type: "Savings", balance: 8500.00, change: 250.00, changePercent: 3.03 },
-  { name: "Credit Card", type: "Credit", balance: -890.25, change: -120.00, changePercent: 15.6 },
-  { name: "Investment Account", type: "Investment", balance: 25340.75, change: 1234.50, changePercent: 5.12 },
-];
-
-//todo: remove mock functionality
-const mockTransactions: Transaction[] = [
-  { id: "1", date: "2024-01-15", payee: "Whole Foods", category: "Groceries", account: "Checking Account", amount: -145.32 },
-  { id: "2", date: "2024-01-14", payee: "Monthly Salary", category: "Income", account: "Checking Account", amount: 4500.00 },
-  { id: "3", date: "2024-01-13", payee: "Electric Company", category: "Utilities", account: "Checking Account", amount: -89.50 },
-  { id: "4", date: "2024-01-12", payee: "Transfer to Savings", category: "Transfer", account: "Savings Account", amount: 500.00 },
-  { id: "5", date: "2024-01-11", payee: "Amazon", category: "Shopping", account: "Credit Card", amount: -234.99 },
-];
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Account, Transaction as DBTransaction } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AccountsView() {
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const { toast } = useToast();
+
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
+    queryKey: ['/api/accounts'],
+  });
+
+  const { data: allTransactions = [], isLoading: transactionsLoading } = useQuery<DBTransaction[]>({
+    queryKey: ['/api/transactions'],
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/accounts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/accounts'] });
+      toast({
+        title: "Account deleted",
+        description: "The account has been successfully deleted.",
+      });
+      setSelectedAccount(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete account.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/transactions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/transactions'] });
+      toast({
+        title: "Transaction deleted",
+        description: "The transaction has been successfully deleted.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transaction.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (accountsLoading || transactionsLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading accounts...</p>
+        </div>
+      </div>
+    );
+  }
 
   const filteredTransactions = selectedAccount
-    ? mockTransactions.filter(t => t.account === selectedAccount)
-    : mockTransactions;
+    ? allTransactions.filter(t => t.accountId === selectedAccount)
+    : allTransactions;
 
-  const totalBalance = mockAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const displayTransactions: Transaction[] = filteredTransactions.map(t => ({
+    id: t.id,
+    date: new Date(t.date).toISOString().split('T')[0],
+    payee: t.payee,
+    category: t.categoryId || '',
+    account: t.accountId,
+    amount: parseFloat(t.amount),
+  }));
+
+  const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance), 0);
+
+  const displayAccounts = accounts.map(acc => ({
+    id: acc.id,
+    name: acc.name,
+    type: acc.type.charAt(0).toUpperCase() + acc.type.slice(1),
+    balance: parseFloat(acc.balance),
+    change: 0,
+    changePercent: 0,
+  }));
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
@@ -39,7 +106,7 @@ export default function AccountsView() {
           <h1 className="text-3xl font-semibold">Accounts</h1>
           <p className="text-muted-foreground mt-1">Manage your accounts and view transactions</p>
         </div>
-        <Button data-testid="button-add-account">
+        <Button onClick={() => setShowAccountForm(true)} data-testid="button-add-account">
           <Plus className="h-4 w-4 mr-2" />
           Add Account
         </Button>
@@ -59,23 +126,33 @@ export default function AccountsView() {
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Your Accounts</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {mockAccounts.map((account) => (
-            <div
-              key={account.name}
-              onClick={() => setSelectedAccount(account.name)}
-              className="cursor-pointer"
-            >
-              <AccountCard {...account} />
-            </div>
-          ))}
-        </div>
+        {accounts.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-muted-foreground mb-4">No accounts yet. Add your first account to get started!</p>
+            <Button onClick={() => setShowAccountForm(true)} data-testid="button-add-first-account">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Account
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {displayAccounts.map((account) => (
+              <div
+                key={account.id}
+                onClick={() => setSelectedAccount(account.id)}
+                className="cursor-pointer"
+              >
+                <AccountCard {...account} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">
-            {selectedAccount ? `${selectedAccount} Transactions` : "All Transactions"}
+            {selectedAccount ? `Account Transactions` : "All Transactions"}
           </h2>
           {selectedAccount && (
             <Button
@@ -88,12 +165,23 @@ export default function AccountsView() {
             </Button>
           )}
         </div>
-        <TransactionsTable
-          transactions={filteredTransactions}
-          onEdit={(t) => console.log("Edit transaction:", t)}
-          onDelete={(id) => console.log("Delete transaction:", id)}
-        />
+        {filteredTransactions.length === 0 ? (
+          <Card className="p-12 text-center">
+            <p className="text-muted-foreground">No transactions found for this account.</p>
+          </Card>
+        ) : (
+          <TransactionsTable
+            transactions={displayTransactions}
+            onEdit={(t) => console.log("Edit transaction:", t)}
+            onDelete={(id) => deleteTransactionMutation.mutate(id)}
+          />
+        )}
       </div>
+
+      <AccountForm
+        open={showAccountForm}
+        onClose={() => setShowAccountForm(false)}
+      />
     </div>
   );
 }

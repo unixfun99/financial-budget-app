@@ -11,38 +11,119 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useState } from "react";
 
 //todo: remove mock functionality
-const monthlyData = [
-  { month: "Jul", income: 4500, expenses: 3200 },
-  { month: "Aug", income: 4500, expenses: 3450 },
-  { month: "Sep", income: 4800, expenses: 3100 },
-  { month: "Oct", income: 4500, expenses: 3600 },
-  { month: "Nov", income: 4500, expenses: 3300 },
-  { month: "Dec", income: 5200, expenses: 4100 },
-  { month: "Jan", income: 4500, expenses: 2950 },
+const allMonthlyData = [
+  { month: "Feb '24", income: 4200, expenses: 3100 },
+  { month: "Mar '24", income: 4500, expenses: 3300 },
+  { month: "Apr '24", income: 4400, expenses: 3200 },
+  { month: "May '24", income: 4600, expenses: 3400 },
+  { month: "Jun '24", income: 4500, expenses: 3250 },
+  { month: "Jul '24", income: 4500, expenses: 3200 },
+  { month: "Aug '24", income: 4500, expenses: 3450 },
+  { month: "Sep '24", income: 4800, expenses: 3100 },
+  { month: "Oct '24", income: 4500, expenses: 3600 },
+  { month: "Nov '24", income: 4500, expenses: 3300 },
+  { month: "Dec '24", income: 5200, expenses: 4100 },
+  { month: "Jan '25", income: 4500, expenses: 2950 },
 ];
 
-//todo: remove mock functionality
-const categoryData = [
-  { name: "Groceries", value: 500, color: "hsl(var(--chart-1))" },
-  { name: "Dining Out", value: 200, color: "hsl(var(--chart-2))" },
-  { name: "Transportation", value: 300, color: "hsl(var(--chart-3))" },
-  { name: "Utilities", value: 250, color: "hsl(var(--chart-4))" },
-  { name: "Entertainment", value: 150, color: "hsl(var(--chart-5))" },
-];
+const getFilteredData = (period: string) => {
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0-11 (Jan = 0)
+  const currentYear = now.getFullYear();
+  
+  switch(period) {
+    case "mtd": // Month to date - just current month
+      return allMonthlyData.slice(-1);
+    case "ytd": // Year to date - last 7 months (simulating Jul-Jan)
+      return allMonthlyData.slice(-7);
+    case "last6": // Last 6 months
+      return allMonthlyData.slice(-6);
+    case "last12": // Last 12 months
+      return allMonthlyData;
+    default:
+      return allMonthlyData.slice(-7);
+  }
+};
 
-//todo: remove mock functionality
-const netWorthData = [
-  { month: "Jul", value: 42000 },
-  { month: "Aug", value: 43200 },
-  { month: "Sep", value: 45000 },
-  { month: "Oct", value: 44500 },
-  { month: "Nov", value: 46800 },
-  { month: "Dec", value: 48200 },
-  { month: "Jan", value: 51230 },
-];
+const getCategoryData = (period: string) => {
+  // Simulate different spending patterns for different periods
+  const baseData = [
+    { name: "Groceries", color: "hsl(var(--chart-1))" },
+    { name: "Dining Out", color: "hsl(var(--chart-2))" },
+    { name: "Transportation", color: "hsl(var(--chart-3))" },
+    { name: "Utilities", color: "hsl(var(--chart-4))" },
+    { name: "Entertainment", color: "hsl(var(--chart-5))" },
+  ];
+  
+  const multipliers: Record<string, number> = {
+    mtd: 0.2,  // One month
+    ytd: 1,    // 7 months
+    last6: 0.86, // 6 months
+    last12: 1.7, // 12 months
+  };
+  
+  const multiplier = multipliers[period] || 1;
+  
+  return baseData.map(cat => ({
+    ...cat,
+    value: Math.round((
+      cat.name === "Groceries" ? 500 :
+      cat.name === "Dining Out" ? 200 :
+      cat.name === "Transportation" ? 300 :
+      cat.name === "Utilities" ? 250 :
+      150
+    ) * multiplier)
+  }));
+};
+
+const getNetWorthData = (period: string) => {
+  const allData = [
+    { month: "Feb '24", value: 39500 },
+    { month: "Mar '24", value: 40200 },
+    { month: "Apr '24", value: 40800 },
+    { month: "May '24", value: 41500 },
+    { month: "Jun '24", value: 42000 },
+    { month: "Jul '24", value: 42500 },
+    { month: "Aug '24", value: 43200 },
+    { month: "Sep '24", value: 45000 },
+    { month: "Oct '24", value: 44500 },
+    { month: "Nov '24", value: 46800 },
+    { month: "Dec '24", value: 48200 },
+    { month: "Jan '25", value: 51230 },
+  ];
+  
+  switch(period) {
+    case "mtd":
+      return allData.slice(-1);
+    case "ytd":
+      return allData.slice(-7);
+    case "last6":
+      return allData.slice(-6);
+    case "last12":
+      return allData;
+    default:
+      return allData.slice(-7);
+  }
+};
 
 export default function ReportsView() {
   const [selectedPeriod, setSelectedPeriod] = useState("ytd");
+  
+  const monthlyData = getFilteredData(selectedPeriod);
+  const categoryData = getCategoryData(selectedPeriod);
+  const netWorthData = getNetWorthData(selectedPeriod);
+  
+  const totalIncome = monthlyData.reduce((sum, m) => sum + m.income, 0);
+  const totalExpenses = monthlyData.reduce((sum, m) => sum + m.expenses, 0);
+  const netSavings = totalIncome - totalExpenses;
+  const savingsRate = totalIncome > 0 ? ((netSavings / totalIncome) * 100).toFixed(0) : 0;
+  
+  const periodLabel = {
+    mtd: "This month",
+    ytd: "Last 7 months",
+    last6: "Last 6 months",
+    last12: "Last 12 months",
+  }[selectedPeriod] || "Selected period";
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
@@ -97,10 +178,10 @@ export default function ReportsView() {
                 <CardTitle className="text-sm font-medium">Total Income</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-mono font-semibold tracking-tight text-primary">
-                  $32,500
+                <div className="text-2xl font-mono font-semibold tracking-tight text-primary" data-testid="text-total-income">
+                  ${totalIncome.toLocaleString()}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Last 7 months</p>
+                <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
               </CardContent>
             </Card>
 
@@ -109,10 +190,10 @@ export default function ReportsView() {
                 <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-mono font-semibold tracking-tight text-destructive">
-                  $23,700
+                <div className="text-2xl font-mono font-semibold tracking-tight text-destructive" data-testid="text-total-expenses">
+                  ${totalExpenses.toLocaleString()}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Last 7 months</p>
+                <p className="text-xs text-muted-foreground mt-1">{periodLabel}</p>
               </CardContent>
             </Card>
 
@@ -121,10 +202,10 @@ export default function ReportsView() {
                 <CardTitle className="text-sm font-medium">Net Savings</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-mono font-semibold tracking-tight text-primary">
-                  $8,800
+                <div className="text-2xl font-mono font-semibold tracking-tight text-primary" data-testid="text-net-savings">
+                  ${netSavings.toLocaleString()}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">27% savings rate</p>
+                <p className="text-xs text-muted-foreground mt-1">{savingsRate}% savings rate</p>
               </CardContent>
             </Card>
           </div>

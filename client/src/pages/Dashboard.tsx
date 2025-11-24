@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { AccountCard } from "@/components/AccountCard";
 import { TransactionsTable, type Transaction } from "@/components/TransactionsTable";
 import { TransactionForm } from "@/components/TransactionForm";
+import { AccountForm } from "@/components/AccountForm";
 import { ImportCSV } from "@/components/ImportCSV";
 import { Plus, Upload, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { useState } from "react";
@@ -14,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Dashboard() {
   const [showTransactionForm, setShowTransactionForm] = useState(false);
   const [showImportCSV, setShowImportCSV] = useState(false);
+  const [showAddAccount, setShowAddAccount] = useState(false);
   const { toast } = useToast();
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
@@ -48,8 +50,13 @@ export default function Dashboard() {
     deleteTransactionMutation.mutate(id);
   };
 
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
   const handleEditTransaction = (transaction: Transaction) => {
-    console.log("Edit transaction:", transaction);
+    // Set the transaction first, then open the form to avoid race condition
+    setEditingTransaction(transaction);
+    // Use setTimeout to ensure state update completes before opening dialog
+    setTimeout(() => setShowTransactionForm(true), 0);
   };
 
   const handleImport = (file: File) => {
@@ -160,7 +167,7 @@ export default function Dashboard() {
         {accounts.length === 0 ? (
           <Card className="p-12 text-center">
             <p className="text-muted-foreground mb-4">No accounts yet. Add your first account to get started!</p>
-            <Button data-testid="button-add-account">
+            <Button onClick={() => setShowAddAccount(true)} data-testid="button-add-account">
               <Plus className="h-4 w-4 mr-2" />
               Add Account
             </Button>
@@ -193,12 +200,32 @@ export default function Dashboard() {
         )}
       </div>
 
+      <AccountForm
+        open={showAddAccount}
+        onClose={() => setShowAddAccount(false)}
+      />
+
       <TransactionForm
         open={showTransactionForm}
-        onClose={() => setShowTransactionForm(false)}
-        onSave={(data) => {
-          console.log("Transaction saved:", data);
+        onClose={() => {
           setShowTransactionForm(false);
+          setEditingTransaction(null);
+        }}
+        initialTransaction={editingTransaction}
+        onSave={(data) => {
+          if (data.id) {
+            toast({
+              title: "Transaction updated",
+              description: "The transaction has been updated successfully.",
+            });
+          } else {
+            toast({
+              title: "Transaction created",
+              description: "The transaction has been created successfully.",
+            });
+          }
+          setShowTransactionForm(false);
+          setEditingTransaction(null);
         }}
       />
 

@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
+import { useState } from "react";
 
 //todo: remove mock functionality
 const monthlyData = [
@@ -41,6 +42,8 @@ const netWorthData = [
 ];
 
 export default function ReportsView() {
+  const [selectedPeriod, setSelectedPeriod] = useState("ytd");
+
   return (
     <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
@@ -48,7 +51,7 @@ export default function ReportsView() {
           <h1 className="text-3xl font-semibold">Reports</h1>
           <p className="text-muted-foreground mt-1">Financial insights and analytics</p>
         </div>
-        <Select defaultValue="ytd">
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
           <SelectTrigger className="w-[180px]" data-testid="select-period">
             <SelectValue placeholder="Select period" />
           </SelectTrigger>

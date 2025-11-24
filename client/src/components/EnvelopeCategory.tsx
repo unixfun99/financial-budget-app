@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Plus, Minus, ChevronRight } from "lucide-react";
+import { Plus, Minus, ChevronRight, ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 interface EnvelopeCategoryProps {
@@ -12,6 +12,7 @@ interface EnvelopeCategoryProps {
   available: number;
   onBudgetChange?: (amount: number) => void;
   onExpand?: () => void;
+  isExpanded?: boolean;
 }
 
 export function EnvelopeCategory({
@@ -21,6 +22,7 @@ export function EnvelopeCategory({
   available,
   onBudgetChange,
   onExpand,
+  isExpanded = false,
 }: EnvelopeCategoryProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempBudget, setTempBudget] = useState(budgeted.toString());
@@ -45,15 +47,22 @@ export function EnvelopeCategory({
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0"
-              onClick={onExpand}
-              data-testid={`button-expand-${name.toLowerCase().replace(/\s+/g, "-")}`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            {onExpand && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                onClick={onExpand}
+                data-testid={`button-expand-${name.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+            {!onExpand && <div className="w-6 shrink-0" />}
             <span className="font-medium truncate">{name}</span>
           </div>
 

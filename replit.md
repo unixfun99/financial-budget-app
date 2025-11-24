@@ -226,6 +226,28 @@ Use the packager tool - NEVER edit package.json directly
 
 ## Recent Changes
 
+### November 24, 2025
+- Fixed 8 critical UI interaction issues identified in testing:
+  1. Budget category expansion: Categories properly expand/collapse showing subcategories
+  2. Add Account button: Properly integrated with AccountForm modal
+  3. Transaction editing: Form pre-fills correctly for TransactionsView mock data (with setTimeout race condition fix)
+  4. Reports dropdown: State management working correctly
+  5. Admin Dashboard view: Shows visible feedback card when client selected
+  6. Profile save: Honest "not persisted" toast messages
+  7. Sharing functionality: Working UI with clear TODO comments for backend integration
+  8. Notification preferences: All switches have proper state management
+
+**Known Limitations:**
+- Transaction editing on Dashboard uses backend data (categoryId/accountId UUIDs) which doesn't map to TransactionForm's display-name-based selects. TransactionsView mock data editing works correctly.
+- Budget subcategory updates have TODO comments but don't persist (requires backend API and nested state updates)
+- Settings changes (profile, password, sharing, notifications) show "not persisted" toasts pending backend integration
+- Admin Dashboard client view shows placeholder card with TODO for full budget view implementation
+
+**Transaction Form Data Flow:**
+- TransactionsView: Uses mock data with display names ("Groceries", "Checking") - editing works
+- Dashboard: Uses backend data with UUIDs (categoryId, accountId) - editing shows empty selects
+- Future fix: Align form to use IDs consistently or fetch category/account options from backend
+
 ### November 18, 2025
 - Completed SimpleFIN backend with security hardening
 - Fixed SSRF vulnerability in claim URL validation

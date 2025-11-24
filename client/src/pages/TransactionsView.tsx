@@ -26,24 +26,38 @@ export default function TransactionsView() {
   const [showImportCSV, setShowImportCSV] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const filteredTransactions = transactions.filter(t =>
     t.payee.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.category.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddTransaction = (transaction: any) => {
-    const newTransaction: Transaction = {
-      id: Date.now().toString(),
-      ...transaction,
-    };
-    setTransactions([newTransaction, ...transactions]);
-    console.log("Transaction added:", newTransaction);
+  const handleSaveTransaction = (transaction: any) => {
+    if (transaction.id) {
+      // Update existing transaction
+      setTransactions(transactions.map(t => 
+        t.id === transaction.id ? { ...transaction, amount: transaction.amount } : t
+      ));
+    } else {
+      // Create new transaction
+      const newTransaction: Transaction = {
+        id: Date.now().toString(),
+        ...transaction,
+      };
+      setTransactions([newTransaction, ...transactions]);
+    }
+  };
+
+  const handleEditTransaction = (transaction: Transaction) => {
+    // Set the transaction first, then open the form to avoid race condition
+    setEditingTransaction(transaction);
+    // Use setTimeout to ensure state update completes before opening dialog
+    setTimeout(() => setShowTransactionForm(true), 0);
   };
 
   const handleDeleteTransaction = (id: string) => {
     setTransactions(transactions.filter(t => t.id !== id));
-    console.log("Transaction deleted:", id);
   };
 
   return (
@@ -87,14 +101,18 @@ export default function TransactionsView() {
 
       <TransactionsTable
         transactions={filteredTransactions}
-        onEdit={(t) => console.log("Edit transaction:", t)}
+        onEdit={handleEditTransaction}
         onDelete={handleDeleteTransaction}
       />
 
       <TransactionForm
         open={showTransactionForm}
-        onClose={() => setShowTransactionForm(false)}
-        onSave={handleAddTransaction}
+        onClose={() => {
+          setShowTransactionForm(false);
+          setEditingTransaction(null);
+        }}
+        initialTransaction={editingTransaction}
+        onSave={handleSaveTransaction}
       />
 
       <ImportCSV

@@ -6,8 +6,58 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Save } from "lucide-react";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsView() {
+  const { toast } = useToast();
+  const [profileData, setProfileData] = useState({
+    name: "John Doe",
+    email: "john@example.com",
+    phone: "",
+  });
+  const [sharingEnabled, setSharingEnabled] = useState(false);
+  const [plannerEmail, setPlannerEmail] = useState("");
+  const [budgetAlerts, setBudgetAlerts] = useState(true);
+  const [transactionAlerts, setTransactionAlerts] = useState(false);
+  const [monthlyReports, setMonthlyReports] = useState(true);
+
+  const handleSaveProfile = () => {
+    // TODO: Implement backend API call to persist profile changes
+    toast({
+      title: "Profile updated (not persisted)",
+      description: "This is a UI-only demo. Backend integration needed to save changes.",
+    });
+  };
+
+  const handleChangePassword = () => {
+    // TODO: Implement backend API call for password change
+    // TODO: Add validation for password strength and confirmation match
+    toast({
+      title: "Password updated (not persisted)",
+      description: "This is a UI-only demo. Backend integration needed to change password.",
+    });
+  };
+
+  const handleShareAccess = () => {
+    if (!plannerEmail) {
+      toast({
+        title: "Error",
+        description: "Please enter a planner email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // TODO: Implement backend API call to persist sharing permissions
+    // TODO: Add validation for duplicate email addresses
+    // TODO: Handle revoking access when sharing is disabled
+    toast({
+      title: "Sharing configured (not persisted)",
+      description: `This is a UI-only demo. Backend integration needed to actually share budget with ${plannerEmail}.`,
+    });
+    setPlannerEmail("");
+  };
+
   return (
     <div className="flex flex-col gap-6 p-6 max-w-4xl mx-auto">
       <div>
@@ -31,22 +81,42 @@ export default function SettingsView() {
             <CardContent className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" placeholder="John Doe" defaultValue="John Doe" data-testid="input-name" />
+                <Input
+                  id="name"
+                  placeholder="John Doe"
+                  value={profileData.name}
+                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                  data-testid="input-name"
+                />
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="john@example.com" defaultValue="john@example.com" data-testid="input-email" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="john@example.com"
+                  value={profileData.email}
+                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                  data-testid="input-email"
+                />
               </div>
 
               <div className="grid gap-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" type="tel" placeholder="+1 (555) 123-4567" data-testid="input-phone" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  value={profileData.phone}
+                  onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                  data-testid="input-phone"
+                />
               </div>
 
               <Separator />
 
-              <Button data-testid="button-save-profile">
+              <Button onClick={handleSaveProfile} data-testid="button-save-profile">
                 <Save className="h-4 w-4 mr-2" />
                 Save Changes
               </Button>
@@ -74,7 +144,7 @@ export default function SettingsView() {
                 <Input id="confirm-password" type="password" data-testid="input-confirm-password" />
               </div>
 
-              <Button data-testid="button-change-password">Update Password</Button>
+              <Button onClick={handleChangePassword} data-testid="button-change-password">Update Password</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -95,7 +165,11 @@ export default function SettingsView() {
                     Allow financial planners to view your budget
                   </p>
                 </div>
-                <Switch data-testid="switch-enable-sharing" />
+                <Switch
+                  checked={sharingEnabled}
+                  onCheckedChange={setSharingEnabled}
+                  data-testid="switch-enable-sharing"
+                />
               </div>
 
               <Separator />
@@ -107,9 +181,18 @@ export default function SettingsView() {
                     id="planner-email"
                     type="email"
                     placeholder="planner@example.com"
+                    value={plannerEmail}
+                    onChange={(e) => setPlannerEmail(e.target.value)}
+                    disabled={!sharingEnabled}
                     data-testid="input-planner-email"
                   />
-                  <Button data-testid="button-share">Share Access</Button>
+                  <Button
+                    onClick={handleShareAccess}
+                    disabled={!sharingEnabled}
+                    data-testid="button-share"
+                  >
+                    Share Access
+                  </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Enter the email address of your financial planner to grant them view-only access to your budget.
@@ -142,7 +225,11 @@ export default function SettingsView() {
                     Get notified when you exceed budget limits
                   </p>
                 </div>
-                <Switch defaultChecked data-testid="switch-budget-alerts" />
+                <Switch
+                  checked={budgetAlerts}
+                  onCheckedChange={setBudgetAlerts}
+                  data-testid="switch-budget-alerts"
+                />
               </div>
 
               <Separator />
@@ -154,7 +241,11 @@ export default function SettingsView() {
                     Receive notifications for new transactions
                   </p>
                 </div>
-                <Switch data-testid="switch-transaction-alerts" />
+                <Switch
+                  checked={transactionAlerts}
+                  onCheckedChange={setTransactionAlerts}
+                  data-testid="switch-transaction-alerts"
+                />
               </div>
 
               <Separator />
@@ -166,7 +257,11 @@ export default function SettingsView() {
                     Get monthly budget summary reports
                   </p>
                 </div>
-                <Switch defaultChecked data-testid="switch-monthly-reports" />
+                <Switch
+                  checked={monthlyReports}
+                  onCheckedChange={setMonthlyReports}
+                  data-testid="switch-monthly-reports"
+                />
               </div>
             </CardContent>
           </Card>

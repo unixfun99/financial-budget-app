@@ -16,15 +16,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface TransactionFormProps {
   open: boolean;
   onClose: () => void;
   onSave?: (transaction: any) => void;
+  initialTransaction?: any | null;
 }
 
-export function TransactionForm({ open, onClose, onSave }: TransactionFormProps) {
+export function TransactionForm({ open, onClose, onSave, initialTransaction }: TransactionFormProps) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     payee: "",
@@ -34,28 +35,68 @@ export function TransactionForm({ open, onClose, onSave }: TransactionFormProps)
     notes: "",
   });
 
+  useEffect(() => {
+    // Only reset form data when dialog first opens
+    if (!open) return;
+    
+    if (initialTransaction) {
+      // Map display values to form values
+      const categoryMap: Record<string, string> = {
+        'Groceries': 'groceries',
+        'Dining Out': 'dining',
+        'Transportation': 'transportation',
+        'Utilities': 'utilities',
+        'Entertainment': 'entertainment',
+        'Income': 'income',
+        'Healthcare': 'healthcare',
+        'Shopping': 'shopping',
+        'Transfer': 'transfer',
+      };
+      
+      const accountMap: Record<string, string> = {
+        'Checking': 'checking',
+        'Checking Account': 'checking',
+        'Savings': 'savings',
+        'Savings Account': 'savings',
+        'Credit Card': 'credit',
+      };
+
+      setFormData({
+        date: initialTransaction.date || new Date().toISOString().split('T')[0],
+        payee: initialTransaction.payee || "",
+        category: categoryMap[initialTransaction.category] || "",
+        account: accountMap[initialTransaction.account] || "",
+        amount: Math.abs(initialTransaction.amount || 0).toString(),
+        notes: initialTransaction.notes || "",
+      });
+    } else {
+      // Only reset to empty if we're creating a new transaction (not editing)
+      setFormData({
+        date: new Date().toISOString().split('T')[0],
+        payee: "",
+        category: "",
+        account: "",
+        amount: "",
+        notes: "",
+      });
+    }
+  }, [open, initialTransaction]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave?.({
+      ...(initialTransaction && { id: initialTransaction.id }),
       ...formData,
       amount: parseFloat(formData.amount),
     });
     onClose();
-    setFormData({
-      date: new Date().toISOString().split('T')[0],
-      payee: "",
-      category: "",
-      account: "",
-      amount: "",
-      notes: "",
-    });
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
+          <DialogTitle>{initialTransaction ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">

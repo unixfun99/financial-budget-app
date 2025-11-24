@@ -52,6 +52,13 @@ const mockClients = [
 export default function AdminDashboard() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
 
+  const handleViewClient = (clientId: string, hasAccess: boolean) => {
+    if (!hasAccess) return;
+    setSelectedClient(clientId);
+    // TODO: Implement client budget view - navigate to dedicated page or open modal with client's budget data
+    // For now, just tracking the selected client
+  };
+
   const getHealthColor = (score: number) => {
     if (score >= 80) return "text-primary";
     if (score >= 60) return "text-chart-4";
@@ -115,6 +122,25 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {selectedClient && (
+        <Card className="p-6 bg-muted/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold">Selected Client</h3>
+              <p className="text-sm text-muted-foreground">
+                Client ID: {selectedClient}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                TODO: Implement full client budget view with detailed financial data, transactions, and budget categories
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => setSelectedClient(null)}>
+              Close
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <div>
         <h2 className="text-xl font-semibold mb-4">Client Overview</h2>
@@ -191,6 +217,10 @@ export default function AdminDashboard() {
                         size="sm"
                         variant="outline"
                         disabled={!client.sharedAccess}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewClient(client.id, client.sharedAccess);
+                        }}
                         data-testid={`button-view-${client.id}`}
                       >
                         <Eye className="h-4 w-4 mr-2" />

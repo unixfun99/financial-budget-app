@@ -6,17 +6,37 @@ import { useState } from "react";
 
 //todo: remove mock functionality
 const mockCategories = [
-  { id: "1", name: "Groceries", budgeted: 500, spent: 423.50, available: 76.50 },
-  { id: "2", name: "Dining Out", budgeted: 200, spent: 145.30, available: 54.70 },
-  { id: "3", name: "Transportation", budgeted: 300, spent: 245.00, available: 55.00 },
-  { id: "4", name: "Utilities", budgeted: 250, spent: 189.50, available: 60.50 },
-  { id: "5", name: "Entertainment", budgeted: 150, spent: 78.99, available: 71.01 },
-  { id: "6", name: "Healthcare", budgeted: 200, spent: 0, available: 200 },
-  { id: "7", name: "Savings Goal", budgeted: 1000, spent: 0, available: 1000 },
+  { id: "1", name: "Groceries", budgeted: 500, spent: 423.50, available: 76.50, subcategories: [
+    { id: "1-1", name: "Weekly Shopping", budgeted: 300, spent: 250, available: 50 },
+    { id: "1-2", name: "Organic Produce", budgeted: 200, spent: 173.50, available: 26.50 },
+  ]},
+  { id: "2", name: "Dining Out", budgeted: 200, spent: 145.30, available: 54.70, subcategories: [
+    { id: "2-1", name: "Restaurants", budgeted: 150, spent: 120, available: 30 },
+    { id: "2-2", name: "Coffee Shops", budgeted: 50, spent: 25.30, available: 24.70 },
+  ]},
+  { id: "3", name: "Transportation", budgeted: 300, spent: 245.00, available: 55.00, subcategories: [
+    { id: "3-1", name: "Gas", budgeted: 200, spent: 180, available: 20 },
+    { id: "3-2", name: "Public Transit", budgeted: 100, spent: 65, available: 35 },
+  ]},
+  { id: "4", name: "Utilities", budgeted: 250, spent: 189.50, available: 60.50, subcategories: [] },
+  { id: "5", name: "Entertainment", budgeted: 150, spent: 78.99, available: 71.01, subcategories: [] },
+  { id: "6", name: "Healthcare", budgeted: 200, spent: 0, available: 200, subcategories: [] },
+  { id: "7", name: "Savings Goal", budgeted: 1000, spent: 0, available: 1000, subcategories: [] },
 ];
 
 export default function BudgetView() {
   const [categories, setCategories] = useState(mockCategories);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedCategories(newExpanded);
+  };
 
   const handleBudgetChange = (id: string, newAmount: number) => {
     setCategories(categories.map(cat => {
@@ -29,7 +49,6 @@ export default function BudgetView() {
       }
       return cat;
     }));
-    console.log(`Budget updated for category ${id}: $${newAmount}`);
   };
 
   const totalBudgeted = categories.reduce((sum, cat) => sum + cat.budgeted, 0);
@@ -101,12 +120,30 @@ export default function BudgetView() {
 
       <div className="flex flex-col gap-2">
         {categories.map((category) => (
-          <EnvelopeCategory
-            key={category.id}
-            {...category}
-            onBudgetChange={(amount) => handleBudgetChange(category.id, amount)}
-            onExpand={() => console.log(`Expand category: ${category.name}`)}
-          />
+          <div key={category.id} className="flex flex-col gap-2">
+            <EnvelopeCategory
+              {...category}
+              isExpanded={expandedCategories.has(category.id)}
+              onBudgetChange={(amount) => handleBudgetChange(category.id, amount)}
+              onExpand={() => toggleExpand(category.id)}
+            />
+            {expandedCategories.has(category.id) && category.subcategories && category.subcategories.length > 0 && (
+              <div className="ml-12 flex flex-col gap-2">
+                {category.subcategories.map((sub: any) => (
+                  <EnvelopeCategory
+                    key={sub.id}
+                    {...sub}
+                    onBudgetChange={(amount) => {
+                      // TODO: Implement proper nested state updates for subcategories
+                      // Currently would overwrite parent category instead of updating the subcategory
+                      // Needs: setCategories with deep immutable update at categories[parentIndex].subcategories[subIndex]
+                      // Also requires: Backend API support for nested category budgets
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         ))}
       </div>
     </div>

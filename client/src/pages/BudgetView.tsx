@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EnvelopeCategory } from "@/components/EnvelopeCategory";
+import { CategoryForm } from "@/components/CategoryForm";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -27,6 +28,7 @@ const mockCategories = [
 export default function BudgetView() {
   const [categories, setCategories] = useState(mockCategories);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -51,6 +53,39 @@ export default function BudgetView() {
     }));
   };
 
+  const handleSubcategoryBudgetChange = (parentId: string, subcategoryId: string, newAmount: number) => {
+    setCategories(categories.map(cat => {
+      if (cat.id === parentId && cat.subcategories) {
+        return {
+          ...cat,
+          subcategories: cat.subcategories.map((sub: any) => {
+            if (sub.id === subcategoryId) {
+              return {
+                ...sub,
+                budgeted: newAmount,
+                available: newAmount - sub.spent
+              };
+            }
+            return sub;
+          })
+        };
+      }
+      return cat;
+    }));
+  };
+
+  const handleAddCategory = (categoryData: { name: string; budgeted: number }) => {
+    const newCategory = {
+      id: Date.now().toString(),
+      name: categoryData.name,
+      budgeted: categoryData.budgeted,
+      spent: 0,
+      available: categoryData.budgeted,
+      subcategories: [],
+    };
+    setCategories([...categories, newCategory]);
+  };
+
   const totalBudgeted = categories.reduce((sum, cat) => sum + cat.budgeted, 0);
   const totalSpent = categories.reduce((sum, cat) => sum + cat.spent, 0);
   const totalAvailable = categories.reduce((sum, cat) => sum + cat.available, 0);
@@ -62,7 +97,7 @@ export default function BudgetView() {
           <h1 className="text-3xl font-semibold">Budget</h1>
           <p className="text-muted-foreground mt-1">Envelope-style budget management</p>
         </div>
-        <Button data-testid="button-add-category">
+        <Button onClick={() => setShowCategoryForm(true)} data-testid="button-add-category">
           <Plus className="h-4 w-4 mr-2" />
           Add Category
         </Button>
@@ -133,12 +168,7 @@ export default function BudgetView() {
                   <EnvelopeCategory
                     key={sub.id}
                     {...sub}
-                    onBudgetChange={(amount) => {
-                      // TODO: Implement proper nested state updates for subcategories
-                      // Currently would overwrite parent category instead of updating the subcategory
-                      // Needs: setCategories with deep immutable update at categories[parentIndex].subcategories[subIndex]
-                      // Also requires: Backend API support for nested category budgets
-                    }}
+                    onBudgetChange={(amount) => handleSubcategoryBudgetChange(category.id, sub.id, amount)}
                   />
                 ))}
               </div>
@@ -146,6 +176,12 @@ export default function BudgetView() {
           </div>
         ))}
       </div>
+
+      <CategoryForm
+        open={showCategoryForm}
+        onOpenChange={setShowCategoryForm}
+        onSave={handleAddCategory}
+      />
     </div>
   );
 }

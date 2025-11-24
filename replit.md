@@ -226,6 +226,12 @@ Use the packager tool - NEVER edit package.json directly
 
 ## Recent Changes
 
+### November 24, 2025 (Latest)
+- Fixed 3 additional bugs:
+  1. **Add Category button**: Now opens CategoryForm dialog to create new budget categories
+  2. **Subcategory +/- buttons**: Properly update nested subcategory budgets with immutable state updates
+  3. **Reports time period dropdown**: Actually filters data when changed (MTD, YTD, Last 6 Months, Last 12 Months)
+
 ### November 24, 2025
 - Fixed 8 critical UI interaction issues identified in testing:
   1. Budget category expansion: Categories properly expand/collapse showing subcategories

@@ -33,6 +33,8 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   isFinancialPlanner: boolean("is_financial_planner").default(false).notNull(),
+  subscriptionId: varchar("subscription_id"), // Reference to active subscription
+  stripeCustomerId: varchar("stripe_customer_id"), // Stripe customer ID for payments
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -52,6 +54,7 @@ export const accounts = pgTable("accounts", {
   name: varchar("name", { length: 255 }).notNull(),
   type: accountTypeEnum("type").notNull(),
   balance: decimal("balance", { precision: 12, scale: 2 }).default("0").notNull(),
+  connectionType: varchar("connection_type", { length: 50 }).default("none"), // none, simplefin, plaid
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -61,6 +64,7 @@ export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
+  parentCategoryId: varchar("parent_category_id").references(() => categories.id, { onDelete: "cascade" }), // For subcategories
   budgeted: decimal("budgeted", { precision: 12, scale: 2 }).default("0").notNull(),
   sortOrder: decimal("sort_order", { precision: 10, scale: 2 }).default("0").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -125,6 +129,32 @@ export const importLogs = pgTable("import_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// User subscriptions
+export const subscriptions = pgTable("subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  stripeSubscriptionId: varchar("stripe_subscription_id").unique(),
+  plan: varchar("plan", { length: 50 }).notNull(), // free, user ($1/month), planner ($5/month)
+  status: varchar("status", { length: 50 }).default("active").notNull(), // active, canceled, expired
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Coupon codes
+export const coupons = pgTable("coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code", { length: 50 }).unique().notNull(),
+  plan: varchar("plan", { length: 50 }).notNull(), // user or planner
+  discountType: varchar("discount_type", { length: 20 }).notNull(), // percent or fixed
+  discountValue: decimal("discount_value", { precision: 8, scale: 2 }).notNull(),
+  durationMonths: decimal("duration_months", { precision: 5, scale: 0 }).notNull(), // number of months free/discounted
+  maxUses: decimal("max_uses", { precision: 10, scale: 0 }), // null = unlimited
+  currentUses: decimal("current_uses", { precision: 10, scale: 0 }).default("0").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -134,6 +164,14 @@ export const usersRelations = relations(users, ({ many }) => ({
   budgetsSharedWithMe: many(budgetShares, { relationName: "budgetsSharedWithMe" }),
   simplefinConnections: many(simplefinConnections),
   importLogs: many(importLogs),
+  subscriptions: many(subscriptions),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
 }));
 
 export const simplefinConnectionsRelations = relations(simplefinConnections, ({ one }) => ({
@@ -215,6 +253,12 @@ export type SimplefinConnection = typeof simplefinConnections.$inferSelect;
 
 export type InsertImportLog = typeof importLogs.$inferInsert;
 export type ImportLog = typeof importLogs.$inferSelect;
+
+export type InsertSubscription = typeof subscriptions.$inferInsert;
+export type Subscription = typeof subscriptions.$inferSelect;
+
+export type InsertCoupon = typeof coupons.$inferInsert;
+export type Coupon = typeof coupons.$inferSelect;
 
 // Zod schemas for validation
 export const insertAccountSchema = createInsertSchema(accounts).omit({

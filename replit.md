@@ -226,7 +226,42 @@ Use the packager tool - NEVER edit package.json directly
 
 ## Recent Changes
 
-### November 24, 2025 (Latest)
+### November 24, 2025 (Latest - Major Feature Release)
+- **Subcategory Creation**: Added ability to create and manage sub-categories within budget categories
+  - New UI in CategoryForm with Main Category/Sub-Category tabs
+  - Support for unlimited nested budget levels
+  - Independent budget tracking for each sub-category
+  
+- **Account Connection Options**: Enhanced account creation with bank sync choices
+  - Manual account creation (no connection)
+  - SimpleFIN bank syncing option ($1.50/month)
+  - Plaid bank syncing option (secure OAuth)
+  - Connection type selection during account creation
+  
+- **Pricing & Subscription System**: Complete sign-up flow with Stripe payments
+  - Free tier: Basic budget tracking ($0)
+  - Personal tier: Full features ($1/month)
+  - Financial Planner tier: Multi-client management ($5/month)
+  - Coupon/discount code system with flexible duration
+  - Signup page with plan selection and validation
+  - Pricing page with feature comparison
+  
+- **Database Schema Enhancements**:
+  - Added `parentCategoryId` to categories for subcategories
+  - Added `connectionType` to accounts for bank sync selection
+  - New `subscriptions` table for plan tracking
+  - New `coupons` table for promo codes with:
+    - Flexible discount types (percent/fixed)
+    - Usage limits per coupon
+    - Expiration dates
+    - Duration-based offers
+  - Added `subscriptionId` and `stripeCustomerId` to users
+  
+- **Routes Added**:
+  - `/pricing` - Public pricing page
+  - `/signup` - Public signup with plan selection
+
+### November 24, 2025
 - Fixed 3 additional bugs:
   1. **Add Category button**: Now opens CategoryForm dialog to create new budget categories
   2. **Subcategory +/- buttons**: Properly update nested subcategory budgets with immutable state updates

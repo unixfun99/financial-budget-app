@@ -74,16 +74,39 @@ export default function BudgetView() {
     }));
   };
 
-  const handleAddCategory = (categoryData: { name: string; budgeted: number }) => {
-    const newCategory = {
-      id: Date.now().toString(),
-      name: categoryData.name,
-      budgeted: categoryData.budgeted,
-      spent: 0,
-      available: categoryData.budgeted,
-      subcategories: [],
-    };
-    setCategories([...categories, newCategory]);
+  const handleAddCategory = (categoryData: { name: string; budgeted: number; isSubcategory?: boolean; parentCategoryName?: string }) => {
+    if (categoryData.isSubcategory) {
+      // Add as subcategory
+      setCategories(categories.map(cat => {
+        if (cat.name === categoryData.parentCategoryName) {
+          return {
+            ...cat,
+            subcategories: [
+              ...(cat.subcategories || []),
+              {
+                id: Date.now().toString(),
+                name: categoryData.name,
+                budgeted: categoryData.budgeted,
+                spent: 0,
+                available: categoryData.budgeted,
+              },
+            ],
+          };
+        }
+        return cat;
+      }));
+    } else {
+      // Add as main category
+      const newCategory = {
+        id: Date.now().toString(),
+        name: categoryData.name,
+        budgeted: categoryData.budgeted,
+        spent: 0,
+        available: categoryData.budgeted,
+        subcategories: [],
+      };
+      setCategories([...categories, newCategory]);
+    }
   };
 
   const totalBudgeted = categories.reduce((sum, cat) => sum + cat.budgeted, 0);
@@ -181,6 +204,7 @@ export default function BudgetView() {
         open={showCategoryForm}
         onOpenChange={setShowCategoryForm}
         onSave={handleAddCategory}
+        parentCategories={categories.map(cat => ({ id: cat.id, name: cat.name }))}
       />
     </div>
   );

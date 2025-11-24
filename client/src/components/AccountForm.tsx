@@ -32,6 +32,7 @@ export function AccountForm({ open, onClose }: AccountFormProps) {
     name: "",
     type: "checking" as "checking" | "savings" | "credit" | "investment" | "other",
     balance: "0",
+    connectionType: "none" as "none" | "simplefin" | "plaid",
   });
 
   const createAccountMutation = useMutation({
@@ -50,6 +51,7 @@ export function AccountForm({ open, onClose }: AccountFormProps) {
         name: "",
         type: "checking",
         balance: "0",
+        connectionType: "none",
       });
     },
     onError: (error) => {
@@ -118,6 +120,34 @@ export function AccountForm({ open, onClose }: AccountFormProps) {
                 required
               />
             </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="connection">Bank Connection</Label>
+              <Select
+                value={formData.connectionType}
+                onValueChange={(value: any) => setFormData({ ...formData, connectionType: value })}
+              >
+                <SelectTrigger id="connection" data-testid="select-connection-type">
+                  <SelectValue placeholder="Select connection type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Manual Account (No Connection)</SelectItem>
+                  <SelectItem value="simplefin">SimpleFIN Bank Sync</SelectItem>
+                  <SelectItem value="plaid">Plaid Bank Sync</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.connectionType !== "none" && (
+              <div className="p-3 bg-muted rounded-md text-sm">
+                <p className="text-muted-foreground">
+                  {formData.connectionType === "simplefin" 
+                    ? "SimpleFIN will sync your transactions automatically. Setup available in Import & Sync page."
+                    : "Plaid will connect your bank account securely. Setup available in Import & Sync page."
+                  }
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

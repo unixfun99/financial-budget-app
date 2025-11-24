@@ -8,9 +8,14 @@ export default function Landing() {
       <header className="border-b">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-primary">Budget Planner</h1>
-          <Button asChild data-testid="button-login">
-            <a href="/api/login">Log In with Google</a>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" asChild data-testid="button-pricing">
+              <a href="/pricing">Pricing</a>
+            </Button>
+            <Button asChild data-testid="button-login">
+              <a href="/api/login">Log In</a>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -24,7 +29,7 @@ export default function Landing() {
             and share budgets with financial planners.
           </p>
           <Button size="lg" asChild data-testid="button-get-started">
-            <a href="/api/login">Get Started with Google</a>
+            <a href="/signup?plan=free">Get Started - Free</a>
           </Button>
         </section>
 
@@ -80,9 +85,14 @@ export default function Landing() {
           <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
             Join thousands of users who have taken control of their finances with our envelope-style budgeting system.
           </p>
-          <Button size="lg" asChild>
-            <a href="/api/login">Sign Up with Google - It's Free</a>
-          </Button>
+          <div className="flex gap-4 justify-center">
+            <Button size="lg" asChild>
+              <a href="/signup?plan=free">Get Started Free</a>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <a href="/pricing">See Plans & Pricing</a>
+            </Button>
+          </div>
         </section>
       </main>
 

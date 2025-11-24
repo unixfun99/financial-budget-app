@@ -509,7 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (budget.accounts) {
         for (const ynabAccount of budget.accounts) {
-          if (ynabAccount.deleted || ynabAccount.closed) continue;
+          if (ynabAccount.closed) continue;
           
           const accountData = ynab.mapYNABAccountToLocal(ynabAccount);
           const localAccount = await storage.createAccount({
@@ -657,6 +657,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching import logs:", error);
       res.status(500).json({ message: "Failed to fetch import logs" });
+    }
+  });
+
+  // Stripe subscription routes
+  app.get("/api/pricing", async (req, res) => {
+    try {
+      // Return plan pricing information
+      const plans = [
+        {
+          id: "free",
+          name: "Free",
+          price: 0,
+          period: "forever",
+          stripePriceId: null,
+        },
+        {
+          id: "user",
+          name: "Personal",
+          price: 100, // $1.00 in cents
+          period: "month",
+          stripePriceId: "price_personal", // Update with actual Stripe price ID
+        },
+        {
+          id: "planner",
+          name: "Financial Planner",
+          price: 500, // $5.00 in cents
+          period: "month",
+          stripePriceId: "price_planner", // Update with actual Stripe price ID
+        },
+      ];
+      res.json(plans);
+    } catch (error) {
+      console.error("Error fetching pricing:", error);
+      res.status(500).json({ message: "Failed to fetch pricing" });
+    }
+  });
+
+  app.post("/api/subscription/validate-coupon", async (req: any, res) => {
+    try {
+      const { couponCode } = req.body;
+      
+      if (!couponCode) {
+        return res.status(400).json({ message: "Coupon code is required" });
+      }
+
+      // TODO: Implement coupon validation against coupons table
+      // For now, return demo response
+      res.json({
+        valid: true,
+        discount: "100% off",
+        durationMonths: 3,
+      });
+    } catch (error) {
+      console.error("Error validating coupon:", error);
+      res.status(500).json({ message: "Failed to validate coupon" });
+    }
+  });
+
+  app.post("/api/subscription/checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { plan, couponCode } = req.body;
+
+      if (!plan) {
+        return res.status(400).json({ message: "Plan is required" });
+      }
+
+      // TODO: Integrate with Stripe checkout
+      // For now, return demo response
+      res.json({
+        checkoutUrl: "https://stripe.com/checkout/demo",
+        sessionId: "session_demo_" + Math.random().toString(36).substring(7),
+      });
+    } catch (error) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ message: "Failed to create checkout session" });
     }
   });
 

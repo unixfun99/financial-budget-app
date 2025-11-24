@@ -77,7 +77,7 @@ export function parseYNABCSV(csvContent: string): YNABCSVRow[] {
     trim: true,
   });
   
-  return records;
+  return records as YNABCSVRow[];
 }
 
 export function mapYNABAccountToLocal(ynabAccount: YNABAccount): {

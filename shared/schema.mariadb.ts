@@ -35,28 +35,20 @@ export const users = mysqlTable("users", {
   isFinancialPlanner: boolean("is_financial_planner").default(false).notNull(),
   subscriptionId: varchar("subscription_id", { length: 36 }), // Reference to active subscription
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }), // Stripe customer ID for payments
-  createdAt: datetime("created_at").defaultNow(),
-  updatedAt: datetime("updated_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
+  updatedAt: datetime("updated_at").default(sql`NOW()`),
 });
-
-export const accountTypeEnum = mysqlEnum("account_type", [
-  "checking",
-  "savings",
-  "credit",
-  "investment",
-  "other",
-]);
 
 // Financial accounts (checking, savings, credit cards, etc.)
 export const accounts = mysqlTable("accounts", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`UUID()`),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
-  type: accountTypeEnum("type").notNull(),
+  type: mysqlEnum("type", ["checking", "savings", "credit", "investment", "other"]).notNull(),
   balance: decimal("balance", { precision: 12, scale: 2 }).default("0").notNull(),
   connectionType: varchar("connection_type", { length: 50 }).default("none"), // none, simplefin, plaid
-  createdAt: datetime("created_at").defaultNow(),
-  updatedAt: datetime("updated_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
+  updatedAt: datetime("updated_at").default(sql`NOW()`),
 });
 
 // Budget categories (envelopes)
@@ -67,8 +59,8 @@ export const categories = mysqlTable("categories", {
   parentCategoryId: varchar("parent_category_id", { length: 36 }).references(() => categories.id, { onDelete: "cascade" }), // For subcategories
   budgeted: decimal("budgeted", { precision: 12, scale: 2 }).default("0").notNull(),
   sortOrder: decimal("sort_order", { precision: 10, scale: 2 }).default("0").notNull(),
-  createdAt: datetime("created_at").defaultNow(),
-  updatedAt: datetime("updated_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
+  updatedAt: datetime("updated_at").default(sql`NOW()`),
 });
 
 // Transactions
@@ -83,8 +75,8 @@ export const transactions = mysqlTable("transactions", {
   notes: text("notes"),
   isTransfer: boolean("is_transfer").default(false).notNull(),
   transferId: varchar("transfer_id", { length: 36 }),
-  createdAt: datetime("created_at").defaultNow(),
-  updatedAt: datetime("updated_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
+  updatedAt: datetime("updated_at").default(sql`NOW()`),
 });
 
 // Budget sharing - allows users to share their budgets with financial planners
@@ -92,7 +84,7 @@ export const budgetShares = mysqlTable("budget_shares", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`UUID()`),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   sharedWithUserId: varchar("shared_with_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
-  createdAt: datetime("created_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
 });
 
 // SimpleFIN bank connections - stores encrypted access URLs for bank syncing
@@ -103,30 +95,22 @@ export const simplefinConnections = mysqlTable("simplefin_connections", {
   connectionName: varchar("connection_name", { length: 255 }), // User-friendly name
   lastSync: datetime("last_sync"),
   isActive: boolean("is_active").default(true).notNull(),
-  createdAt: datetime("created_at").defaultNow(),
-  updatedAt: datetime("updated_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
+  updatedAt: datetime("updated_at").default(sql`NOW()`),
 });
-
-export const importSourceEnum = mysqlEnum("import_source", [
-  "ynab_json",
-  "ynab_csv",
-  "actual_budget",
-  "simplefin",
-  "csv",
-]);
 
 // Import logs - tracks all imports from external sources
 export const importLogs = mysqlTable("import_logs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`UUID()`),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
-  source: importSourceEnum("source").notNull(),
+  source: mysqlEnum("source", ["ynab_json", "ynab_csv", "actual_budget", "simplefin", "csv"]).notNull(),
   fileName: varchar("file_name", { length: 255 }),
   accountsImported: decimal("accounts_imported", { precision: 10, scale: 0 }).default("0").notNull(),
   transactionsImported: decimal("transactions_imported", { precision: 10, scale: 0 }).default("0").notNull(),
   categoriesImported: decimal("categories_imported", { precision: 10, scale: 0 }).default("0").notNull(),
   status: varchar("status", { length: 50 }).default("success").notNull(), // success, partial, failed
   errorMessage: text("error_message"),
-  createdAt: datetime("created_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
 });
 
 // User subscriptions
@@ -137,8 +121,8 @@ export const subscriptions = mysqlTable("subscriptions", {
   plan: varchar("plan", { length: 50 }).notNull(), // free, user ($1/month), planner ($5/month)
   status: varchar("status", { length: 50 }).default("active").notNull(), // active, canceled, expired
   currentPeriodEnd: datetime("current_period_end"),
-  createdAt: datetime("created_at").defaultNow(),
-  updatedAt: datetime("updated_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
+  updatedAt: datetime("updated_at").default(sql`NOW()`),
 });
 
 // Coupon codes
@@ -152,7 +136,7 @@ export const coupons = mysqlTable("coupons", {
   maxUses: decimal("max_uses", { precision: 10, scale: 0 }), // null = unlimited
   currentUses: decimal("current_uses", { precision: 10, scale: 0 }).default("0").notNull(),
   expiresAt: datetime("expires_at"),
-  createdAt: datetime("created_at").defaultNow(),
+  createdAt: datetime("created_at").default(sql`NOW()`),
 });
 
 // Relations

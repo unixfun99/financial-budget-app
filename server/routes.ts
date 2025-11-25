@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { getStorage, type IStorage } from "./storage/index";
 import { setupAuth, isAuthenticated } from "./auth";
 import {
   insertAccountSchema,
@@ -18,6 +18,9 @@ import * as simplefin from "./simplefin";
 import * as ynab from "./ynab";
 import * as actualbudget from "./actualbudget";
 
+// Storage will be initialized async
+let storage: IStorage;
+
 function sanitizeRequestBody(body: any, forbiddenKeys: string[]): any {
   const sanitized = JSON.parse(JSON.stringify(body));
   forbiddenKeys.forEach(key => delete sanitized[key]);
@@ -25,6 +28,9 @@ function sanitizeRequestBody(body: any, forbiddenKeys: string[]): any {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize storage based on environment
+  storage = await getStorage();
+  
   // Auth middleware
   await setupAuth(app);
 

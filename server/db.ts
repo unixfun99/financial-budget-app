@@ -1,5 +1,7 @@
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle as drizzleNeon } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 import * as devSchema from "@shared/schema";
-import * as prodSchema from "@shared/schema.mariadb";
 
 // Detect environment
 const isReplit = !!process.env.REPL_ID;
@@ -10,36 +12,11 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Use appropriate driver based on environment
-let db: any;
+// For Replit development, use Neon serverless (PostgreSQL)
+// For production, this file won't be used - production uses MariaDB driver
+neonConfig.webSocketConstructor = ws;
 
-if (isReplit) {
-  // Development: Use Neon serverless (PostgreSQL)
-  console.log("Using Neon serverless database (Replit)");
-  const { Pool, neonConfig } = require("@neondatabase/serverless");
-  const { drizzle } = require("drizzle-orm/neon-serverless");
-  const ws = require("ws");
+console.log(isReplit ? "Using Neon serverless database (Replit)" : "Using MySQL/MariaDB database (Production)");
 
-  neonConfig.webSocketConstructor = ws;
-
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  db = drizzle({ client: pool, schema: devSchema });
-} else {
-  // Production: Use MySQL/MariaDB
-  console.log("Using MySQL/MariaDB database (Production)");
-  const { createPool } = require("mysql2/promise");
-  const { drizzle } = require("drizzle-orm/mysql2/promise");
-
-  const pool = createPool({
-    uri: process.env.DATABASE_URL,
-    enableKeepAlive: true,
-    enableStreamingResults: false,
-    waitForConnections: true,
-    connectionLimit: 5,
-    queueLimit: 0,
-  });
-
-  db = drizzle({ client: pool, schema: prodSchema, mode: "default" });
-}
-
-export { db };
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const db = drizzleNeon({ client: pool, schema: devSchema });

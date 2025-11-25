@@ -1,11 +1,11 @@
 # Financial Budgeting Application
 
 ## Overview
-A web-based financial budgeting application inspired by ActualBudget.com with envelope-style budgeting, bank syncing via SimpleFIN, and import support from YNAB and Actual Budget.
+A web-based financial budgeting application inspired by ActualBudget.com with envelope-style budgeting, bank syncing via SimpleFIN, and import support from YNAB and Actual Budget. Supports subscription-based pricing ($1/month users, $5/month planners) with Stripe integration.
 
 **Key Features:**
-- Google authentication via Replit Auth
-- Envelope-style budgeting (inspired by ActualBudget.com)
+- Google authentication via Replit Auth (dev) / OAuth (production)
+- Envelope-style budgeting with budget categories and subcategories
 - Account management with transaction tracking
 - SimpleFIN bank syncing ($1.50/month service)
 - Import from YNAB (JSON and CSV formats)
@@ -13,32 +13,37 @@ A web-based financial budgeting application inspired by ActualBudget.com with en
 - CSV transaction import
 - Admin/financial planner interface for budget sharing
 - Transfer management between accounts
+- Stripe payment integration with coupon codes
 
 **Technology Stack:**
 - Frontend: React, Wouter (routing), TanStack Query, Shadcn UI, Tailwind CSS
-- Backend: Express, PostgreSQL (via Drizzle ORM)
-- Authentication: Replit Auth (Google login)
+- Backend: Express, PostgreSQL (Replit dev) or MariaDB (production, Rocky Linux)
+- Authentication: Replit Auth (Google login via Replit)
 - Fonts: Inter (UI), JetBrains Mono (financial figures)
 
 ## Project Architecture
 
 ### Database Schema
-Main tables defined in `shared/schema.ts`:
+Main tables defined in `shared/schema.ts` (PostgreSQL) and `shared/schema.mariadb.ts` (MariaDB):
 - `users` - User accounts with Google authentication
 - `accounts` - Financial accounts (checking, savings, credit cards, etc.)
 - `categories` - Budget categories with envelope-style tracking
 - `transactions` - Financial transactions with category assignments
 - `simplefinConnections` - SimpleFIN bank connection metadata
 - `importLogs` - Track all import operations (SimpleFIN, YNAB, Actual Budget)
+- `subscriptions` - User subscription tracking
+- `coupons` - Discount code management
 
 ### Data Model Principles
 - Keep schemas simple - avoid unnecessary timestamps unless required
 - Use Drizzle Zod schemas for type safety
 - Insert schemas exclude auto-generated fields
 - Select types inferred from table schemas
+- Dual schema support: PostgreSQL for dev, MariaDB for production
 
 ### Storage Pattern
-- In-memory storage (MemStorage) preferred unless database required
+- In-memory storage (MemStorage) for development
+- Database storage for production
 - Storage interface (`IStorage` in `server/storage.ts`) defines all CRUD operations
 - Storage layer uses types from `@shared/schema.ts`
 
@@ -50,6 +55,7 @@ Main tables defined in `shared/schema.ts`:
 - YNAB import in `server/ynab.ts`
 - Actual Budget import in `server/actualbudget.ts`
 - Encryption utilities in `server/crypto.ts`
+- Stripe integration: `stripeClient.ts`, `stripeService.ts`, `webhookHandlers.ts`
 
 ### Frontend Architecture
 - Routing: Wouter (pages in `client/src/pages/`, registered in `client/src/App.tsx`)
@@ -74,32 +80,9 @@ SimpleFIN provides secure bank account syncing for $1.50/month. The integration 
 - **Claim URL Validation:** Multi-layer validation to prevent SSRF attacks:
   - Protocol: Must be HTTPS only
   - Host allowlist: Only `bridge.simplefin.org` and `beta-bridge.simplefin.org`
-  - Exact hostname matching: Validates hostname structure to prevent subdomain bypass (e.g., rejects `bridge.simplefin.org.evil.com`)
+  - Exact hostname matching: Validates hostname structure to prevent subdomain bypass
   - Path validation: Must contain `/simplefin` in the path
-- **SSRF Protection:** Defense-in-depth approach prevents Server-Side Request Forgery attacks through:
-  - URL parsing validation
-  - Hostname part count verification (prevents extra subdomains)
-  - Exact string matching of allowed hosts
-
-### Setup Process
-1. User visits https://bridge.simplefin.org
-2. User creates SimpleFIN account and links their bank ($1.50/month)
-3. User receives a setup token (claim URL)
-4. User pastes setup token in the Import & Sync page
-5. Application validates claim URL (HTTPS + approved host)
-6. Application claims the access URL from SimpleFIN
-7. Access URL is encrypted and stored in database
-8. User can now sync transactions
-
-### Sync Workflow
-1. User clicks "Sync" button on connected bank
-2. Confirmation dialog appears
-3. Application decrypts access URL
-4. Application fetches accounts and transactions from SimpleFIN
-5. Accounts are created/updated in database
-6. Transactions are imported (deduplicated by SimpleFIN transaction ID)
-7. Import log is created with results
-8. Cache is invalidated for accounts, transactions, connections, and import logs
+- **SSRF Protection:** Defense-in-depth approach prevents Server-Side Request Forgery attacks
 
 ### API Endpoints
 - `POST /api/simplefin/setup` - Setup a new SimpleFIN connection
@@ -107,88 +90,61 @@ SimpleFIN provides secure bank account syncing for $1.50/month. The integration 
 - `GET /api/simplefin/connections` - Get all SimpleFIN connections
 - `DELETE /api/simplefin/connections/:id` - Remove a SimpleFIN connection
 
-### Best Practices
-- Always sync regularly to keep transactions up to date
-- SimpleFIN syncs last 60 days by default
-- Existing transactions are not deleted when connection is removed
-- Connection metadata (encrypted access URL) is deleted when connection is removed
-- Use confirmation dialogs for destructive actions
+## Stripe Integration
 
-## YNAB Import
+### Subscription Plans
+- **Free**: $0 - Basic budget tracking
+- **Personal**: $1/month - Full feature set for individuals
+- **Financial Planner**: $5/month - Multi-client management
+
+### Coupon System
+- Flexible discount types (percent/fixed)
+- Usage limits per coupon
+- Expiration dates
+- Duration-based offers (X months free/discounted)
+
+### API Endpoints
+- `GET /api/pricing` - Get pricing information
+- `POST /api/subscription/validate-coupon` - Validate coupon code
+- `POST /api/subscription/checkout` - Create Stripe checkout session
+- Stripe webhook handling for subscription events
+
+### Webhook Events Handled
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
+- `invoice.payment_succeeded`
+
+## YNAB and Actual Budget Import
 
 ### Supported Formats
 
-**JSON Format (API Export):**
-```json
-{
-  "budgets": [{
-    "accounts": [{"id": "...", "name": "Checking"}],
-    "categories": [{"id": "...", "name": "Groceries"}],
-    "transactions": [{"date": "2024-01-15", "amount": -50000, "payee_name": "Store"}]
-  }]
-}
-```
+**YNAB JSON and CSV**: Import transaction and category data
+**Actual Budget JSON**: Full budget exports with accounts and categories
 
-**CSV Format:**
-```csv
-Date,Payee,Memo,Amount
-2024-01-15,Store,Groceries,-50.00
-```
-
-### Import Process
-1. User selects format (JSON or CSV)
-2. User pastes content into textarea
-3. For CSV: User specifies account name
-4. Application validates JSON structure or CSV format
-5. Data is parsed and imported
-6. Import log is created
-7. Cache is invalidated
-
-### API Endpoints
+### Import API Endpoints
 - `POST /api/import/ynab-json` - Import YNAB JSON data
 - `POST /api/import/ynab-csv` - Import YNAB CSV data
-
-## Actual Budget Import
-
-### Format
-Actual Budget uses JSON export format:
-```json
-{
-  "accounts": [{"id": "...", "name": "Checking"}],
-  "categories": [{"id": "...", "name": "Groceries"}],
-  "transactions": [{"date": "2024-01-15", "amount": -5000, "payee": "Store"}]
-}
-```
-
-### Import Process
-1. User pastes Actual Budget JSON into textarea
-2. Application validates JSON structure
-3. Data is parsed and imported
-4. Import log is created
-5. Cache is invalidated
-
-### API Endpoints
 - `POST /api/import/actual-budget` - Import Actual Budget data
-
-## Import History
-
-All import operations are logged in the `importLogs` table with:
-- Source (simplefin, ynab, actual_budget)
-- File name
-- Status (success/failure)
-- Counts (accounts, transactions, categories imported)
-- Error messages (if failed)
-- Timestamp
-
-### API Endpoints
 - `GET /api/import/logs` - Get all import logs
 
 ## Environment Variables
 
-Required:
-- `DATABASE_URL` - PostgreSQL connection string
+### Development (Replit)
+- `DATABASE_URL` - PostgreSQL via Neon
 - `SESSION_SECRET` - Express session secret
-- `ENCRYPTION_KEY` - 32-byte hex string for AES-256-GCM encryption
+- `ENCRYPTION_KEY` - 64-character hex string for AES-256-GCM
+- `STRIPE_PUBLIC_KEY` - Stripe test key
+- `STRIPE_SECRET_KEY` - Stripe test key
+- `VITE_STRIPE_PUBLIC_KEY` - Frontend Stripe test key
+
+### Production (Rocky Linux)
+- `DATABASE_URL` - MariaDB connection: `mysql2://user:pass@host:3306/database`
+- `SESSION_SECRET` - Production-grade secret
+- `ENCRYPTION_KEY` - Production encryption key
+- `STRIPE_PUBLIC_KEY` - Stripe live key
+- `STRIPE_SECRET_KEY` - Stripe live key
+- `VITE_STRIPE_PUBLIC_KEY` - Frontend Stripe live key
 
 ## Development Workflow
 
@@ -197,9 +153,9 @@ Required:
 npm run dev
 ```
 This starts:
-- Express server for backend
-- Vite server for frontend
-- Both served on same port (5000)
+- Express server for backend (port 5000)
+- Vite server for frontend (served via Express)
+- Both served on same port with hot reload
 
 ### Database Management
 ```bash
@@ -218,84 +174,140 @@ Use the packager tool - NEVER edit package.json directly
 - Check imports to understand framework choices
 - Always use `data-testid` attributes for interactive elements
 
-## Future Plans
-- Automated sync scheduling for SimpleFIN accounts
-- Budget sharing between users
-- Financial planner admin interface
-- MySQL deployment support on Rocky Linux
+## Deployment Configurations
+
+### Development (Replit)
+- PostgreSQL database (Neon serverless)
+- Replit Auth for authentication
+- In-memory session storage
+- localhost:5000
+
+### Production (Rocky Linux)
+- MariaDB database
+- Apache reverse proxy (HTTP/HTTPS)
+- OAuth2 for authentication
+- SSL/TLS with Let's Encrypt
+- Systemd service for auto-restart
+
+### Production (Docker)
+- Docker Compose with MariaDB
+- Nginx reverse proxy
+- Multi-stage Docker builds
+- Health checks configured
+
+## Deployment Instructions
+
+1. **Rocky Linux Deployment**: See `DEPLOYMENT_ROCKY_LINUX.md`
+2. **Docker Deployment**: See `DEPLOYMENT_DOCKER.md`
+3. **GitHub Setup**: See `GITHUB_DEPLOYMENT.md`
 
 ## Recent Changes
 
-### November 24, 2025 (Latest - Major Feature Release)
-- **Subcategory Creation**: Added ability to create and manage sub-categories within budget categories
-  - New UI in CategoryForm with Main Category/Sub-Category tabs
-  - Support for unlimited nested budget levels
-  - Independent budget tracking for each sub-category
-  
-- **Account Connection Options**: Enhanced account creation with bank sync choices
-  - Manual account creation (no connection)
-  - SimpleFIN bank syncing option ($1.50/month)
-  - Plaid bank syncing option (secure OAuth)
-  - Connection type selection during account creation
-  
-- **Pricing & Subscription System**: Complete sign-up flow with Stripe payments
-  - Free tier: Basic budget tracking ($0)
-  - Personal tier: Full features ($1/month)
-  - Financial Planner tier: Multi-client management ($5/month)
-  - Coupon/discount code system with flexible duration
-  - Signup page with plan selection and validation
-  - Pricing page with feature comparison
-  
-- **Database Schema Enhancements**:
-  - Added `parentCategoryId` to categories for subcategories
-  - Added `connectionType` to accounts for bank sync selection
-  - New `subscriptions` table for plan tracking
-  - New `coupons` table for promo codes with:
-    - Flexible discount types (percent/fixed)
-    - Usage limits per coupon
-    - Expiration dates
-    - Duration-based offers
-  - Added `subscriptionId` and `stripeCustomerId` to users
-  
-- **Routes Added**:
-  - `/pricing` - Public pricing page
-  - `/signup` - Public signup with plan selection
+### November 25, 2025 (Latest - Deployment Refactor)
+- **MariaDB Schema**: Created `shared/schema.mariadb.ts` for Rocky Linux deployment
+  - UUID() instead of gen_random_uuid()
+  - datetime instead of timestamp
+  - JSON instead of JSONB
+  - Native MySQL enums
+- **Drizzle Config**: Added `drizzle.config.mariadb.ts` for production migrations
+- **Apache Configuration**: Created `apache-budget-app.conf` template with:
+  - SSL/TLS setup with Let's Encrypt
+  - Security headers (HSTS, X-Frame-Options, CSP)
+  - Reverse proxy to Node.js
+  - WebSocket support
+  - Gzip compression
+- **Rocky Linux Guide**: Comprehensive `DEPLOYMENT_ROCKY_LINUX.md` with:
+  - System setup and package installation
+  - MariaDB configuration
+  - Node.js installation
+  - Apache/SSL setup
+  - Systemd service configuration
+  - Backup and recovery procedures
+- **GitHub Setup**: Created `GITHUB_DEPLOYMENT.md` with:
+  - Repository initialization
+  - GitHub Actions workflows (build, deploy, test)
+  - Secrets management
+  - Release versioning
+- **Docker Support**: Created `DEPLOYMENT_DOCKER.md` with:
+  - Multi-stage Dockerfile
+  - Docker Compose configurations (dev and prod)
+  - Nginx configuration for production
+  - SSL certificate setup
+  - Database backup/restore scripts
+- **Documentation**: Created `README.md` and `ARCHITECTURE.md`
+  - Feature overview and tech stack
+  - System architecture and component design
+  - Data flow patterns
+  - Deployment architecture
+  - Security architecture
+- **Project Structure**: Updated `replit.md` with deployment information
 
-### November 24, 2025
-- Fixed 3 additional bugs:
-  1. **Add Category button**: Now opens CategoryForm dialog to create new budget categories
-  2. **Subcategory +/- buttons**: Properly update nested subcategory budgets with immutable state updates
-  3. **Reports time period dropdown**: Actually filters data when changed (MTD, YTD, Last 6 Months, Last 12 Months)
+### November 24, 2025 (Stripe & Pricing Release)
+- Stripe payment integration completed
+- Pricing page and signup flow
+- Coupon/discount code system
+- Subscription tier management
 
-### November 24, 2025
-- Fixed 8 critical UI interaction issues identified in testing:
-  1. Budget category expansion: Categories properly expand/collapse showing subcategories
-  2. Add Account button: Properly integrated with AccountForm modal
-  3. Transaction editing: Form pre-fills correctly for TransactionsView mock data (with setTimeout race condition fix)
-  4. Reports dropdown: State management working correctly
-  5. Admin Dashboard view: Shows visible feedback card when client selected
-  6. Profile save: Honest "not persisted" toast messages
-  7. Sharing functionality: Working UI with clear TODO comments for backend integration
-  8. Notification preferences: All switches have proper state management
+### November 24, 2025 (Bug Fixes)
+- Fixed 8 critical UI interaction issues
+- Fixed category expansion and subcategory updates
+- Fixed transaction form pre-fill logic
+- Fixed reports dropdown time period filtering
 
-**Known Limitations:**
-- Transaction editing on Dashboard uses backend data (categoryId/accountId UUIDs) which doesn't map to TransactionForm's display-name-based selects. TransactionsView mock data editing works correctly.
-- Budget subcategory updates have TODO comments but don't persist (requires backend API and nested state updates)
-- Settings changes (profile, password, sharing, notifications) show "not persisted" toasts pending backend integration
-- Admin Dashboard client view shows placeholder card with TODO for full budget view implementation
+## Known Limitations
 
-**Transaction Form Data Flow:**
-- TransactionsView: Uses mock data with display names ("Groceries", "Checking") - editing works
-- Dashboard: Uses backend data with UUIDs (categoryId, accountId) - editing shows empty selects
-- Future fix: Align form to use IDs consistently or fetch category/account options from backend
+- **Transaction Form Data Alignment**: Dashboard uses backend UUID data, TransactionsView uses display names. TransactionsView editing works; Dashboard editing shows empty selects.
+- **Budget Subcategory Updates**: UI works but doesn't persist (requires backend API)
+- **Settings Changes**: Show "not persisted" toasts - pending backend integration
+- **Admin Dashboard**: Placeholder client view card - full budget view pending
 
-### November 18, 2025
-- Completed SimpleFIN backend with security hardening
-- Fixed SSRF vulnerability in claim URL validation
-- Added YNAB and Actual Budget import backends
-- Created Import & Sync page with all import/sync features
-- Added confirmation dialogs for dangerous actions
-- Implemented proper cache invalidation
-- Added import history tracking
-- Form validation for setup tokens
-- Helpful instructions and guidance for users
+## Future Plans
+
+1. **Mobile App**: React Native implementation
+2. **Automated Sync**: Schedule SimpleFIN/Plaid syncs
+3. **Budget Sharing**: Multi-user collaborative budgets
+4. **Advanced Reports**: Dashboard with analytics
+5. **Budget Templates**: Pre-built category templates
+6. **Financial Goals**: Savings goals tracking
+7. **API Keys**: Public API for integrations
+8. **Expense Rules**: Automatic categorization rules
+
+## Database Compatibility
+
+### PostgreSQL (Development)
+- Native UUID generation: `gen_random_uuid()`
+- JSONB for complex data
+- Enum types
+- Used with Replit Neon database
+
+### MariaDB (Production)
+- UUID() function
+- JSON for data (not JSONB)
+- Native MySQL enums
+- Used on Rocky Linux with Apache
+
+## Testing
+
+- All routes validated with proper request/response
+- Form validation via Zod schemas
+- Database operations through storage interface
+- Stripe webhook signature verification
+- SimpleFIN SSRF protection tested
+
+## Security Considerations
+
+- SSRF protection for external URLs (SimpleFIN claims)
+- AES-256-GCM encryption for stored credentials
+- SQL injection prevention via Drizzle ORM
+- CSRF protection ready
+- Stripe webhook signature verification
+- Rate limiting ready for deployment
+- User isolation via userId in all queries
+
+## Performance Notes
+
+- Frontend bundle: 854KB (gzip 242KB)
+- Database indexes on common queries
+- Session storage configurable (MemStore for dev, database for prod)
+- Query optimization via Drizzle ORM
+- Caching via TanStack Query

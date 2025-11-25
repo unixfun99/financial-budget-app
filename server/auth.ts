@@ -57,6 +57,7 @@ async function setupGoogleAuth(app: Express) {
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
+          console.log("Google OAuth callback - profile ID:", profile.id);
           const email = profile.emails?.[0]?.value;
           const firstName = profile.name?.givenName;
           const lastName = profile.name?.familyName;
@@ -111,6 +112,7 @@ async function setupGoogleAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log("Callback handler triggered - code:", req.query.code, "state:", req.query.state);
     passport.authenticate("google", {
       successRedirect: "/",
       failureRedirect: "/api/login",

@@ -85,7 +85,7 @@ if (isReplit) {
   
   const mysqlConfig = parseMySQLUrl(process.env.DATABASE_URL);
   
-  // Configure pool with explicit SSL handling
+  // Configure pool - disable SSL unless explicitly enabled
   const poolConfig: any = {
     host: mysqlConfig.host,
     port: mysqlConfig.port,
@@ -94,28 +94,21 @@ if (isReplit) {
     database: mysqlConfig.database,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0,
-    // Explicitly disable SSL by default
-    ssl: false
+    queueLimit: 0
   };
 
-  // Only enable SSL if CA cert is provided
-  if (process.env.MYSQL_SSL_CA) {
-    if (fs.existsSync(process.env.MYSQL_SSL_CA)) {
-      console.log("Using CA certificate for MySQL SSL");
-      poolConfig.ssl = {
-        ca: fs.readFileSync(process.env.MYSQL_SSL_CA).toString(),
-        rejectUnauthorized: true
-      };
-    }
+  // Only add SSL if explicitly configured
+  if (process.env.MYSQL_SSL_CA && fs.existsSync(process.env.MYSQL_SSL_CA)) {
+    console.log("Using CA certificate for MySQL SSL");
+    poolConfig.ssl = {
+      ca: fs.readFileSync(process.env.MYSQL_SSL_CA).toString(),
+      rejectUnauthorized: true
+    };
   } else if (process.env.MYSQL_SSL_VERIFY === 'false') {
-    // Allow debugging with disabled SSL verification
     console.warn("WARNING: MySQL SSL verification disabled");
     poolConfig.ssl = {
       rejectUnauthorized: false
     };
-  } else {
-    console.log("MySQL: Connecting without SSL");
   }
 
   const mysqlPool = mysql.createPool(poolConfig);

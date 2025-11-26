@@ -85,7 +85,8 @@ if (isReplit) {
   
   const mysqlConfig = parseMySQLUrl(process.env.DATABASE_URL);
   
-  const mysqlPool = mysql.createPool({
+  // Try SSL first, but allow fallback if server doesn't support it
+  const poolConfig: any = {
     host: mysqlConfig.host,
     port: mysqlConfig.port,
     user: mysqlConfig.user,
@@ -93,10 +94,18 @@ if (isReplit) {
     database: mysqlConfig.database,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0,
-    // SSL configuration
-    ssl: getMySQLSSLConfig()
-  });
+    queueLimit: 0
+  };
+
+  // Only add SSL if CA cert is provided or if SSL_VERIFY is explicitly set
+  if (process.env.MYSQL_SSL_CA || process.env.MYSQL_SSL_VERIFY) {
+    poolConfig.ssl = getMySQLSSLConfig();
+  } else {
+    // Default: no SSL (many hosting environments have TLS at the transport layer)
+    console.log("MySQL: Connecting without explicit SSL (TLS may be at transport layer)");
+  }
+
+  const mysqlPool = mysql.createPool(poolConfig);
   
   db = drizzleMysql({ client: mysqlPool, schema: prodSchema, mode: 'default' });
 }

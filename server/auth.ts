@@ -88,9 +88,13 @@ function getSession() {
           expires: 'expires',
           data: 'data'
         }
-      },
-      ssl: getMySQLSSLConfig()
+      }
     };
+    
+    // Only add SSL if CA cert is provided or if SSL_VERIFY is explicitly set
+    if (process.env.MYSQL_SSL_CA || process.env.MYSQL_SSL_VERIFY) {
+      storeOptions.ssl = getMySQLSSLConfig();
+    }
     
     const sessionStore = new MySQLStoreSession(storeOptions);
     console.log("Using MySQL session store for production");

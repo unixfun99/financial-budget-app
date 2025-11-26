@@ -14,18 +14,10 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table (mandatory for Replit Auth)
-export const sessions = mysqlTable(
-  "sessions",
-  {
-    sid: varchar("sid", { length: 255 }).primaryKey(),
-    sess: json("sess").notNull(),
-    expire: datetime("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)]
-);
+// Note: Sessions table is managed by express-mysql-session, not Drizzle
+// The session store creates its own table with columns: session_id, expires, data
 
-// User storage table (mandatory for Replit Auth)
+// User storage table
 export const users = mysqlTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`UUID()`),
   email: varchar("email", { length: 255 }).unique(),

@@ -1,13 +1,75 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import session from "express-session";
+import MySQLStore from "express-mysql-session";
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
+import fs from "fs";
 
 // Detect if running on Replit
 const isReplit = !!process.env.REPL_ID;
 
-// Session configuration for self-hosted deployment
+// Parse MySQL/MariaDB DATABASE_URL to connection options
+function parseMySQLUrl(url: string) {
+  try {
+    // Handle mysql://, mysql2://, and mariadb:// protocols
+    const normalizedUrl = url.replace(/^(mysql2?|mariadb):\/\//, 'mysql://');
+    const parsed = new URL(normalizedUrl);
+    
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port || '3306', 10),
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      database: parsed.pathname.slice(1).split('?')[0],
+    };
+  } catch (error) {
+    throw new Error(`Invalid MySQL DATABASE_URL format. Expected: mysql2://user:password@host:port/database. Error: ${error}`);
+  }
+}
+
+// Build SSL configuration for MySQL
+function getMySQLSSLConfig() {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // Check for CA certificate - prefer secure configuration
+  const caCertPath = process.env.MYSQL_SSL_CA;
+  
+  if (caCertPath && fs.existsSync(caCertPath)) {
+    console.log("Using CA certificate for MySQL SSL verification:", caCertPath);
+    return {
+      ca: fs.readFileSync(caCertPath).toString(),
+      rejectUnauthorized: true
+    };
+  }
+  
+  // If MYSQL_SSL_VERIFY is explicitly set to 'false', allow insecure connections
+  if (process.env.MYSQL_SSL_VERIFY === 'false') {
+    console.warn("WARNING: MySQL SSL verification is disabled (MYSQL_SSL_VERIFY=false).");
+    console.warn("This is insecure and should only be used for debugging!");
+    return {
+      rejectUnauthorized: false
+    };
+  }
+  
+  // In production, require proper SSL configuration
+  if (isProduction) {
+    throw new Error(
+      "MySQL SSL configuration required in production. " +
+      "Set MYSQL_SSL_CA=/path/to/ca-cert.pem for secure connections, " +
+      "or set MYSQL_SSL_VERIFY=false for temporary debugging (not recommended)."
+    );
+  }
+  
+  // In development, allow insecure connections with warning
+  console.warn("WARNING: MySQL SSL verification disabled in development mode.");
+  console.warn("For production, set MYSQL_SSL_CA=/path/to/ca-cert.pem");
+  return {
+    rejectUnauthorized: false
+  };
+}
+
+// Session configuration for self-hosted deployment with MySQL store
 function getSession() {
   if (!process.env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET environment variable is required");
@@ -15,6 +77,44 @@ function getSession() {
 
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
 
+  // For self-hosted deployments, use MySQL session store
+  if (!isReplit && process.env.DATABASE_URL) {
+    const MySQLStoreSession = MySQLStore(session as any);
+    const mysqlConfig = parseMySQLUrl(process.env.DATABASE_URL);
+    
+    const storeOptions = {
+      host: mysqlConfig.host,
+      port: mysqlConfig.port,
+      user: mysqlConfig.user,
+      password: mysqlConfig.password,
+      database: mysqlConfig.database,
+      clearExpired: true,
+      checkExpirationInterval: 900000, // 15 minutes
+      expiration: sessionTtl,
+      createDatabaseTable: true,
+      // Let express-mysql-session use its default table structure
+      // Table: sessions with columns: session_id (varchar), expires (int), data (text)
+      // SSL configuration
+      ssl: getMySQLSSLConfig()
+    };
+    
+    const sessionStore = new MySQLStoreSession(storeOptions);
+    console.log("Using MySQL session store for production");
+    
+    return session({
+      secret: process.env.SESSION_SECRET,
+      store: sessionStore,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: sessionTtl,
+      },
+    });
+  }
+
+  // Fallback to in-memory sessions (for development without DB)
   return session({
     secret: process.env.SESSION_SECRET,
     resave: false,
@@ -112,7 +212,7 @@ async function setupGoogleAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    console.log("Callback handler triggered - code:", req.query.code, "state:", req.query.state);
+    console.log("Callback handler triggered - code:", req.query.code ? "present" : "missing");
     passport.authenticate("google", {
       successRedirect: "/",
       failureRedirect: "/api/login",

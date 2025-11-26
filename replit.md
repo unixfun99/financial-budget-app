@@ -39,10 +39,13 @@ Main tables defined in `shared/schema.ts` (PostgreSQL) and `shared/schema.mariad
 - Dual schema support: PostgreSQL for dev, MariaDB for production
 
 ### Storage Pattern
-- In-memory storage (MemStorage) for development
-- Database storage for production
+- Dual storage adapter architecture for cross-database compatibility
+- `server/storage.ts` - PostgreSQL adapter for Replit (uses `.returning()`, `onConflictDoUpdate`)
+- `server/storage.mysql.ts` - MySQL/MariaDB adapter for production (uses `onDuplicateKeyUpdate`, SELECT-after-INSERT)
 - Storage interface (`IStorage` in `server/storage.ts`) defines all CRUD operations
-- Storage layer uses types from `@shared/schema.ts`
+- Dynamically loads correct adapter based on `REPL_ID` environment variable
+- PostgreSQL storage uses types from `@shared/schema.ts`
+- MySQL storage uses types from `@shared/schema.mariadb.ts`
 
 ### Backend Architecture
 - API routes in `server/routes.ts` (thin layer)

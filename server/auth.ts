@@ -88,23 +88,18 @@ function getSession() {
           expires: 'expires',
           data: 'data'
         }
-      },
-      // Explicitly disable SSL by default
-      ssl: false
+      }
     };
     
-    // Only enable SSL if CA cert is provided
-    if (process.env.MYSQL_SSL_CA) {
-      if (fs.existsSync(process.env.MYSQL_SSL_CA)) {
-        storeOptions.ssl = {
-          ca: fs.readFileSync(process.env.MYSQL_SSL_CA).toString(),
-          rejectUnauthorized: true
-        };
-      }
-    } else if (process.env.MYSQL_SSL_VERIFY === 'false') {
+    // Default: SSL disabled for MariaDB (check have_ssl = DISABLED)
+    if (process.env.MYSQL_SSL_CA && fs.existsSync(process.env.MYSQL_SSL_CA)) {
       storeOptions.ssl = {
-        rejectUnauthorized: false
+        ca: fs.readFileSync(process.env.MYSQL_SSL_CA).toString(),
+        rejectUnauthorized: true
       };
+    } else {
+      // Explicitly use 'off' for mysql2/mariadb to disable SSL
+      storeOptions.ssl = 'off';
     }
     
     const sessionStore = new MySQLStoreSession(storeOptions);

@@ -85,7 +85,7 @@ if (isReplit) {
   
   const mysqlConfig = parseMySQLUrl(process.env.DATABASE_URL);
   
-  // Configure pool - disable SSL unless explicitly enabled
+  // Configure pool with explicit SSL disabled (MariaDB has SSL disabled)
   const poolConfig: any = {
     host: mysqlConfig.host,
     port: mysqlConfig.port,
@@ -94,21 +94,21 @@ if (isReplit) {
     database: mysqlConfig.database,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    enableKeepAlive: true
   };
 
-  // Only add SSL if explicitly configured
+  // Default: SSL disabled for MariaDB (check have_ssl = DISABLED)
   if (process.env.MYSQL_SSL_CA && fs.existsSync(process.env.MYSQL_SSL_CA)) {
     console.log("Using CA certificate for MySQL SSL");
     poolConfig.ssl = {
       ca: fs.readFileSync(process.env.MYSQL_SSL_CA).toString(),
       rejectUnauthorized: true
     };
-  } else if (process.env.MYSQL_SSL_VERIFY === 'false') {
-    console.warn("WARNING: MySQL SSL verification disabled");
-    poolConfig.ssl = {
-      rejectUnauthorized: false
-    };
+  } else {
+    // Explicitly use 'off' for mysql2/mariadb to disable SSL
+    poolConfig.ssl = 'off';
+    console.log("MariaDB: SSL disabled, connecting without encryption");
   }
 
   const mysqlPool = mysql.createPool(poolConfig);

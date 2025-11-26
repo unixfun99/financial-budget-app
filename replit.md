@@ -1,7 +1,7 @@
 # Financial Budgeting Application
 
 ## Overview
-A web-based financial budgeting application inspired by ActualBudget.com with envelope-style budgeting, bank syncing via SimpleFIN, and import support from YNAB and Actual Budget. Supports subscription-based pricing ($1/month users, $5/month planners) with Stripe integration.
+A web-based financial budgeting application inspired by ActualBudget.com with envelope-style budgeting, bank syncing via SimpleFIN, and import support from YNAB and Actual Budget. Free access with Google login only - all pricing/subscription features removed.
 
 **Key Features:**
 - Google authentication via Replit Auth (dev) / OAuth (production)
@@ -13,7 +13,6 @@ A web-based financial budgeting application inspired by ActualBudget.com with en
 - CSV transaction import
 - Admin/financial planner interface for budget sharing
 - Transfer management between accounts
-- Stripe payment integration with coupon codes
 
 **Technology Stack:**
 - Frontend: React, Wouter (routing), TanStack Query, Shadcn UI, Tailwind CSS
@@ -31,8 +30,6 @@ Main tables defined in `shared/schema.ts` (PostgreSQL) and `shared/schema.mariad
 - `transactions` - Financial transactions with category assignments
 - `simplefinConnections` - SimpleFIN bank connection metadata
 - `importLogs` - Track all import operations (SimpleFIN, YNAB, Actual Budget)
-- `subscriptions` - User subscription tracking
-- `coupons` - Discount code management
 
 ### Data Model Principles
 - Keep schemas simple - avoid unnecessary timestamps unless required
@@ -55,7 +52,6 @@ Main tables defined in `shared/schema.ts` (PostgreSQL) and `shared/schema.mariad
 - YNAB import in `server/ynab.ts`
 - Actual Budget import in `server/actualbudget.ts`
 - Encryption utilities in `server/crypto.ts`
-- Stripe integration: `stripeClient.ts`, `stripeService.ts`, `webhookHandlers.ts`
 
 ### Frontend Architecture
 - Routing: Wouter (pages in `client/src/pages/`, registered in `client/src/App.tsx`)
@@ -90,31 +86,6 @@ SimpleFIN provides secure bank account syncing for $1.50/month. The integration 
 - `GET /api/simplefin/connections` - Get all SimpleFIN connections
 - `DELETE /api/simplefin/connections/:id` - Remove a SimpleFIN connection
 
-## Stripe Integration
-
-### Subscription Plans
-- **Free**: $0 - Basic budget tracking
-- **Personal**: $1/month - Full feature set for individuals
-- **Financial Planner**: $5/month - Multi-client management
-
-### Coupon System
-- Flexible discount types (percent/fixed)
-- Usage limits per coupon
-- Expiration dates
-- Duration-based offers (X months free/discounted)
-
-### API Endpoints
-- `GET /api/pricing` - Get pricing information
-- `POST /api/subscription/validate-coupon` - Validate coupon code
-- `POST /api/subscription/checkout` - Create Stripe checkout session
-- Stripe webhook handling for subscription events
-
-### Webhook Events Handled
-- `customer.subscription.created`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
-- `invoice.payment_succeeded`
-
 ## YNAB and Actual Budget Import
 
 ### Supported Formats
@@ -134,17 +105,15 @@ SimpleFIN provides secure bank account syncing for $1.50/month. The integration 
 - `DATABASE_URL` - PostgreSQL via Neon
 - `SESSION_SECRET` - Express session secret
 - `ENCRYPTION_KEY` - 64-character hex string for AES-256-GCM
-- `STRIPE_PUBLIC_KEY` - Stripe test key
-- `STRIPE_SECRET_KEY` - Stripe test key
-- `VITE_STRIPE_PUBLIC_KEY` - Frontend Stripe test key
 
 ### Production (Rocky Linux)
 - `DATABASE_URL` - MariaDB connection: `mysql2://user:pass@host:3306/database`
 - `SESSION_SECRET` - Production-grade secret
 - `ENCRYPTION_KEY` - Production encryption key
-- `STRIPE_PUBLIC_KEY` - Stripe live key
-- `STRIPE_SECRET_KEY` - Stripe live key
-- `VITE_STRIPE_PUBLIC_KEY` - Frontend Stripe live key
+- `NODE_ENV` - Must be set to `production`
+- `MYSQL_SSL_CA` - **Required** Path to CA certificate for MySQL TLS verification
+- `MYSQL_SSL_VERIFY` - Set to `false` to temporarily disable SSL verification (debugging only)
+- `APP_URL` - Full URL of the application (e.g., `https://budget.example.com`)
 
 ## Development Workflow
 

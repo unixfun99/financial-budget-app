@@ -20,63 +20,13 @@ import {
   type InsertSimplefinConnection,
   type ImportLog,
   type InsertImportLog,
-} from "@shared/schema";
+} from "@shared/schema.mariadb";
 import { db } from "./db";
 import { eq, and, desc, or } from "drizzle-orm";
+import { randomUUID } from "crypto";
+import type { IStorage } from "./storage";
 
-// Detect environment
-const isReplit = !!process.env.REPL_ID;
-
-export interface IStorage {
-  // User operations (mandatory for Replit Auth)
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
-  
-  // Account operations
-  getAccounts(userId: string): Promise<Account[]>;
-  getAccount(id: string, userId: string): Promise<Account | undefined>;
-  createAccount(account: InsertAccount): Promise<Account>;
-  updateAccount(id: string, userId: string, updates: Partial<InsertAccount>): Promise<Account | undefined>;
-  deleteAccount(id: string, userId: string): Promise<boolean>;
-  
-  // Category operations
-  getCategories(userId: string): Promise<Category[]>;
-  getCategory(id: string, userId: string): Promise<Category | undefined>;
-  createCategory(category: InsertCategory): Promise<Category>;
-  updateCategory(id: string, userId: string, updates: Partial<InsertCategory>): Promise<Category | undefined>;
-  deleteCategory(id: string, userId: string): Promise<boolean>;
-  
-  // Transaction operations
-  getTransactions(userId: string, accountId?: string): Promise<Transaction[]>;
-  getTransaction(id: string, userId: string): Promise<Transaction | undefined>;
-  createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  updateTransaction(id: string, userId: string, updates: Partial<InsertTransaction>): Promise<Transaction | undefined>;
-  deleteTransaction(id: string, userId: string): Promise<boolean>;
-  
-  // Budget sharing operations
-  getBudgetShares(userId: string): Promise<BudgetShare[]>;
-  getSharedBudgets(financialPlannerId: string): Promise<BudgetShare[]>;
-  createBudgetShare(share: InsertBudgetShare): Promise<BudgetShare>;
-  deleteBudgetShare(userId: string, sharedWithUserId: string): Promise<boolean>;
-  
-  // Financial planner operations
-  getFinancialPlanners(): Promise<User[]>;
-  updateUserRole(userId: string, isFinancialPlanner: boolean): Promise<User | undefined>;
-  
-  // SimpleFIN operations
-  getSimplefinConnections(userId: string): Promise<SimplefinConnection[]>;
-  getSimplefinConnection(id: string, userId: string): Promise<SimplefinConnection | undefined>;
-  createSimplefinConnection(connection: InsertSimplefinConnection): Promise<SimplefinConnection>;
-  updateSimplefinConnection(id: string, userId: string, updates: Partial<InsertSimplefinConnection>): Promise<SimplefinConnection | undefined>;
-  deleteSimplefinConnection(id: string, userId: string): Promise<boolean>;
-  
-  // Import log operations
-  createImportLog(log: InsertImportLog): Promise<ImportLog>;
-  getImportLogs(userId: string): Promise<ImportLog[]>;
-}
-
-// PostgreSQL storage adapter (for Replit/development)
-export class DatabaseStorage implements IStorage {
+export class MySQLDatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -84,17 +34,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
+    if (!userData.id) {
+      throw new Error("User ID is required for upsert");
+    }
+    
+    const userId = userData.id;
+    
+    // Use atomic INSERT ... ON DUPLICATE KEY UPDATE for MySQL/MariaDB
+    await db
       .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
+      .values(userData as any)
+      .onDuplicateKeyUpdate({
         set: {
-          ...userData,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date(),
         },
-      })
-      .returning();
+      });
+    
+    // Return the user
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
     return user;
   }
 
@@ -112,7 +73,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAccount(account: InsertAccount): Promise<Account> {
-    const [newAccount] = await db.insert(accounts).values(account).returning();
+    const id = account.id || randomUUID();
+    await db.insert(accounts).values({ ...account, id });
+    const [newAccount] = await db.select().from(accounts).where(eq(accounts.id, id));
     return newAccount;
   }
 
@@ -127,20 +90,33 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
     
-    const [updated] = await db
+    await db
       .update(accounts)
       .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
-      .returning();
+      .where(and(eq(accounts.id, id), eq(accounts.userId, userId)));
+    
+    const [updated] = await db
+      .select()
+      .from(accounts)
+      .where(and(eq(accounts.id, id), eq(accounts.userId, userId)));
     return updated;
   }
 
   async deleteAccount(id: string, userId: string): Promise<boolean> {
-    const result = await db
-      .delete(accounts)
+    const existing = await db
+      .select()
+      .from(accounts)
       .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
-      .returning();
-    return result.length > 0;
+      .limit(1);
+    
+    if (!existing.length) {
+      return false;
+    }
+    
+    await db
+      .delete(accounts)
+      .where(and(eq(accounts.id, id), eq(accounts.userId, userId)));
+    return true;
   }
 
   // Category operations
@@ -157,7 +133,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
-    const [newCategory] = await db.insert(categories).values(category).returning();
+    const id = category.id || randomUUID();
+    await db.insert(categories).values({ ...category, id });
+    const [newCategory] = await db.select().from(categories).where(eq(categories.id, id));
     return newCategory;
   }
 
@@ -172,20 +150,33 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
     
-    const [updated] = await db
+    await db
       .update(categories)
       .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(categories.id, id), eq(categories.userId, userId)))
-      .returning();
+      .where(and(eq(categories.id, id), eq(categories.userId, userId)));
+    
+    const [updated] = await db
+      .select()
+      .from(categories)
+      .where(and(eq(categories.id, id), eq(categories.userId, userId)));
     return updated;
   }
 
   async deleteCategory(id: string, userId: string): Promise<boolean> {
-    const result = await db
-      .delete(categories)
+    const existing = await db
+      .select()
+      .from(categories)
       .where(and(eq(categories.id, id), eq(categories.userId, userId)))
-      .returning();
-    return result.length > 0;
+      .limit(1);
+    
+    if (!existing.length) {
+      return false;
+    }
+    
+    await db
+      .delete(categories)
+      .where(and(eq(categories.id, id), eq(categories.userId, userId)));
+    return true;
   }
 
   // Transaction operations
@@ -210,7 +201,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const [newTransaction] = await db.insert(transactions).values(transaction).returning();
+    const id = transaction.id || randomUUID();
+    await db.insert(transactions).values({ ...transaction, id });
+    const [newTransaction] = await db.select().from(transactions).where(eq(transactions.id, id));
     return newTransaction;
   }
 
@@ -225,20 +218,33 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
     
-    const [updated] = await db
+    await db
       .update(transactions)
       .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
-      .returning();
+      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
+    
+    const [updated] = await db
+      .select()
+      .from(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
     return updated;
   }
 
   async deleteTransaction(id: string, userId: string): Promise<boolean> {
-    const result = await db
-      .delete(transactions)
+    const existing = await db
+      .select()
+      .from(transactions)
       .where(and(eq(transactions.id, id), eq(transactions.userId, userId)))
-      .returning();
-    return result.length > 0;
+      .limit(1);
+    
+    if (!existing.length) {
+      return false;
+    }
+    
+    await db
+      .delete(transactions)
+      .where(and(eq(transactions.id, id), eq(transactions.userId, userId)));
+    return true;
   }
 
   // Budget sharing operations
@@ -257,21 +263,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBudgetShare(share: InsertBudgetShare): Promise<BudgetShare> {
-    const [newShare] = await db.insert(budgetShares).values(share).returning();
+    const id = share.id || randomUUID();
+    await db.insert(budgetShares).values({ ...share, id });
+    const [newShare] = await db.select().from(budgetShares).where(eq(budgetShares.id, id));
     return newShare;
   }
 
   async deleteBudgetShare(userId: string, sharedWithUserId: string): Promise<boolean> {
-    const result = await db
-      .delete(budgetShares)
+    const existing = await db
+      .select()
+      .from(budgetShares)
       .where(
         and(
           eq(budgetShares.userId, userId),
           eq(budgetShares.sharedWithUserId, sharedWithUserId)
         )
       )
-      .returning();
-    return result.length > 0;
+      .limit(1);
+    
+    if (!existing.length) {
+      return false;
+    }
+    
+    await db
+      .delete(budgetShares)
+      .where(
+        and(
+          eq(budgetShares.userId, userId),
+          eq(budgetShares.sharedWithUserId, sharedWithUserId)
+        )
+      );
+    return true;
   }
 
   // Financial planner operations
@@ -280,11 +302,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUserRole(userId: string, isFinancialPlanner: boolean): Promise<User | undefined> {
-    const [updated] = await db
+    const existing = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    
+    if (!existing.length) {
+      return undefined;
+    }
+    
+    await db
       .update(users)
       .set({ isFinancialPlanner, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning();
+      .where(eq(users.id, userId));
+    
+    const [updated] = await db.select().from(users).where(eq(users.id, userId));
     return updated;
   }
 
@@ -305,7 +338,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSimplefinConnection(connection: InsertSimplefinConnection): Promise<SimplefinConnection> {
-    const [newConnection] = await db.insert(simplefinConnections).values(connection).returning();
+    const id = connection.id || randomUUID();
+    await db.insert(simplefinConnections).values({ ...connection, id });
+    const [newConnection] = await db.select().from(simplefinConnections).where(eq(simplefinConnections.id, id));
     return newConnection;
   }
 
@@ -320,25 +355,40 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
     
-    const [updated] = await db
+    await db
       .update(simplefinConnections)
       .set({ ...updates, updatedAt: new Date() })
-      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)))
-      .returning();
+      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)));
+    
+    const [updated] = await db
+      .select()
+      .from(simplefinConnections)
+      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)));
     return updated;
   }
 
   async deleteSimplefinConnection(id: string, userId: string): Promise<boolean> {
-    const result = await db
-      .delete(simplefinConnections)
+    const existing = await db
+      .select()
+      .from(simplefinConnections)
       .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)))
-      .returning();
-    return result.length > 0;
+      .limit(1);
+    
+    if (!existing.length) {
+      return false;
+    }
+    
+    await db
+      .delete(simplefinConnections)
+      .where(and(eq(simplefinConnections.id, id), eq(simplefinConnections.userId, userId)));
+    return true;
   }
 
   // Import log operations
   async createImportLog(log: InsertImportLog): Promise<ImportLog> {
-    const [newLog] = await db.insert(importLogs).values(log).returning();
+    const id = log.id || randomUUID();
+    await db.insert(importLogs).values({ ...log, id });
+    const [newLog] = await db.select().from(importLogs).where(eq(importLogs.id, id));
     return newLog;
   }
 
@@ -350,20 +400,3 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(importLogs.createdAt));
   }
 }
-
-// Dynamically export the correct storage adapter based on environment
-let storage: IStorage;
-
-if (isReplit) {
-  // Use PostgreSQL adapter for Replit/development
-  console.log("Loading PostgreSQL storage adapter...");
-  storage = new DatabaseStorage();
-} else {
-  // Use MySQL adapter for production
-  console.log("Loading MySQL storage adapter...");
-  // Dynamic import to avoid loading MySQL code in Replit
-  const { MySQLDatabaseStorage } = require("./storage.mysql");
-  storage = new MySQLDatabaseStorage();
-}
-
-export { storage };

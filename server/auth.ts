@@ -49,15 +49,7 @@ function getSession() {
       clearExpired: true,
       checkExpirationInterval: 900000, // 15 minutes
       expiration: sessionTtl,
-      createDatabaseTable: true,
-      schema: {
-        tableName: 'sessions',
-        columnNames: {
-          session_id: 'session_id',
-          expires: 'expires',
-          data: 'data'
-        }
-      }
+      createDatabaseTable: true
     };
     
     const sessionStore = new MySQLStoreSession(storeOptions);

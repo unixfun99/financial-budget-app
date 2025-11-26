@@ -8,8 +8,6 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
-import PricingPage from "@/pages/PricingPage";
-import SignupPage from "@/pages/SignupPage";
 import Dashboard from "@/pages/Dashboard";
 import BudgetView from "@/pages/BudgetView";
 import AccountsView from "@/pages/AccountsView";
@@ -39,8 +37,6 @@ function UnauthenticatedRouter() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
-      <Route path="/pricing" component={PricingPage} />
-      <Route path="/signup" component={SignupPage} />
       <Route component={NotFound} />
     </Switch>
   );

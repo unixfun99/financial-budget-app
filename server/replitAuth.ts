@@ -93,10 +93,6 @@ export function getSession() {
           expires: 'expires',
           data: 'data'
         }
-      },
-      // SSL configuration for self-signed certificates
-      ssl: {
-        rejectUnauthorized: false
       }
     };
     

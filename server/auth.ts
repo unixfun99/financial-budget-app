@@ -4,7 +4,6 @@ import session from "express-session";
 import MySQLStore from "express-mysql-session";
 import type { Express, RequestHandler } from "express";
 import { storage } from "./storage";
-import fs from "fs";
 
 // Detect if running on Replit
 const isReplit = !!process.env.REPL_ID;
@@ -26,36 +25,6 @@ function parseMySQLUrl(url: string) {
   } catch (error) {
     throw new Error(`Invalid MySQL DATABASE_URL format. Expected: mysql2://user:password@host:port/database. Error: ${error}`);
   }
-}
-
-// Build SSL configuration for MySQL
-function getMySQLSSLConfig() {
-  // Check for CA certificate - prefer secure configuration
-  const caCertPath = process.env.MYSQL_SSL_CA;
-  
-  if (caCertPath && fs.existsSync(caCertPath)) {
-    console.log("Using CA certificate for MySQL SSL verification:", caCertPath);
-    return {
-      ca: fs.readFileSync(caCertPath).toString(),
-      rejectUnauthorized: true
-    };
-  }
-  
-  // If MYSQL_SSL_VERIFY is explicitly set to 'false', skip SSL validation
-  if (process.env.MYSQL_SSL_VERIFY === 'false') {
-    console.warn("WARNING: MySQL SSL verification is disabled (MYSQL_SSL_VERIFY=false).");
-    console.warn("This is insecure and should only be used for debugging!");
-    return {
-      rejectUnauthorized: false
-    };
-  }
-  
-  // Default: Try SSL but allow self-signed certificates
-  // This works with most hosting environments
-  console.log("MySQL: Using SSL with self-signed certificate support");
-  return {
-    rejectUnauthorized: false
-  };
 }
 
 // Session configuration for self-hosted deployment with MySQL store
@@ -90,17 +59,6 @@ function getSession() {
         }
       }
     };
-    
-    // Default: SSL disabled for MariaDB (check have_ssl = DISABLED)
-    if (process.env.MYSQL_SSL_CA && fs.existsSync(process.env.MYSQL_SSL_CA)) {
-      storeOptions.ssl = {
-        ca: fs.readFileSync(process.env.MYSQL_SSL_CA).toString(),
-        rejectUnauthorized: true
-      };
-    } else {
-      // Explicitly use 'off' for mysql2/mariadb to disable SSL
-      storeOptions.ssl = 'off';
-    }
     
     const sessionStore = new MySQLStoreSession(storeOptions);
     console.log("Using MySQL session store for production");

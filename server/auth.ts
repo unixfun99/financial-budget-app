@@ -88,12 +88,23 @@ function getSession() {
           expires: 'expires',
           data: 'data'
         }
-      }
+      },
+      // Explicitly disable SSL by default
+      ssl: false
     };
     
-    // Only add SSL if CA cert is provided or if SSL_VERIFY is explicitly set
-    if (process.env.MYSQL_SSL_CA || process.env.MYSQL_SSL_VERIFY) {
-      storeOptions.ssl = getMySQLSSLConfig();
+    // Only enable SSL if CA cert is provided
+    if (process.env.MYSQL_SSL_CA) {
+      if (fs.existsSync(process.env.MYSQL_SSL_CA)) {
+        storeOptions.ssl = {
+          ca: fs.readFileSync(process.env.MYSQL_SSL_CA).toString(),
+          rejectUnauthorized: true
+        };
+      }
+    } else if (process.env.MYSQL_SSL_VERIFY === 'false') {
+      storeOptions.ssl = {
+        rejectUnauthorized: false
+      };
     }
     
     const sessionStore = new MySQLStoreSession(storeOptions);

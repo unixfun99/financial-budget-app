@@ -81,8 +81,14 @@ function getSession() {
       checkExpirationInterval: 900000, // 15 minutes
       expiration: sessionTtl,
       createDatabaseTable: true,
-      // Use default express-mysql-session table structure
-      // Table: sessions with columns: session_id (varchar), expires (int), data (text)
+      schema: {
+        tableName: 'sessions',
+        columnNames: {
+          session_id: 'session_id',
+          expires: 'expires',
+          data: 'data'
+        }
+      },
       ssl: getMySQLSSLConfig()
     };
     

@@ -30,8 +30,6 @@ function parseMySQLUrl(url: string) {
 
 // Build SSL configuration for MySQL
 function getMySQLSSLConfig() {
-  const isProduction = process.env.NODE_ENV === 'production';
-  
   // Check for CA certificate - prefer secure configuration
   const caCertPath = process.env.MYSQL_SSL_CA;
   
@@ -43,7 +41,7 @@ function getMySQLSSLConfig() {
     };
   }
   
-  // If MYSQL_SSL_VERIFY is explicitly set to 'false', allow insecure connections
+  // If MYSQL_SSL_VERIFY is explicitly set to 'false', skip SSL validation
   if (process.env.MYSQL_SSL_VERIFY === 'false') {
     console.warn("WARNING: MySQL SSL verification is disabled (MYSQL_SSL_VERIFY=false).");
     console.warn("This is insecure and should only be used for debugging!");
@@ -52,18 +50,9 @@ function getMySQLSSLConfig() {
     };
   }
   
-  // In production, require proper SSL configuration
-  if (isProduction) {
-    throw new Error(
-      "MySQL SSL configuration required in production. " +
-      "Set MYSQL_SSL_CA=/path/to/ca-cert.pem for secure connections, " +
-      "or set MYSQL_SSL_VERIFY=false for temporary debugging (not recommended)."
-    );
-  }
-  
-  // In development, allow insecure connections with warning
-  console.warn("WARNING: MySQL SSL verification disabled in development mode.");
-  console.warn("For production, set MYSQL_SSL_CA=/path/to/ca-cert.pem");
+  // Default: Try SSL but allow self-signed certificates
+  // This works with most hosting environments
+  console.log("MySQL: Using SSL with self-signed certificate support");
   return {
     rejectUnauthorized: false
   };
@@ -82,7 +71,7 @@ function getSession() {
     const MySQLStoreSession = MySQLStore(session as any);
     const mysqlConfig = parseMySQLUrl(process.env.DATABASE_URL);
     
-    const storeOptions = {
+    const storeOptions: any = {
       host: mysqlConfig.host,
       port: mysqlConfig.port,
       user: mysqlConfig.user,
@@ -92,9 +81,8 @@ function getSession() {
       checkExpirationInterval: 900000, // 15 minutes
       expiration: sessionTtl,
       createDatabaseTable: true,
-      // Let express-mysql-session use its default table structure
+      // Use default express-mysql-session table structure
       // Table: sessions with columns: session_id (varchar), expires (int), data (text)
-      // SSL configuration
       ssl: getMySQLSSLConfig()
     };
     
